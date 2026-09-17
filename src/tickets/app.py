@@ -108,7 +108,8 @@ def create_app(db_path=None, *, notes_path=None, repo_roots=None, translator=_DE
         if app.state.mcp is not None:
             # SDK session managers are single-use. A host app can restart its lifespan
             # (tests and embedded launchers do), so bind a fresh transport each time.
-            app.state.mcp = create_mcp(lambda: app.state.store)
+            app.state.mcp = create_mcp(lambda drydock_id: app.state.drydocks.get(drydock_id).store,
+                                      lambda: app.state.drydocks.list())
             app.state.mcp_http_app = app.state.mcp.streamable_http_app()
         translate_fn = translator
         if translate_fn is _DEFAULT:
@@ -148,7 +149,8 @@ def create_app(db_path=None, *, notes_path=None, repo_roots=None, translator=_DE
     app = FastAPI(title="Moldloft", lifespan=lifespan)
     try:
         from .mcp_surface import create_mcp
-        app.state.mcp = create_mcp(lambda: app.state.store)
+        app.state.mcp = create_mcp(lambda drydock_id: app.state.drydocks.get(drydock_id).store,
+                                  lambda: app.state.drydocks.list())
         mcp_app = app.state.mcp.streamable_http_app()
         app.state.mcp_http_app = mcp_app
     except ModuleNotFoundError as error:

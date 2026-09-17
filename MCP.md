@@ -32,10 +32,17 @@ operations use the same review and durable recovery boundary delivered by #51.
 
 ## 2. Tools and bounds
 
-Every tool description states when to use it. The registered list contains exactly nine tools:
+Every tool description states when to use it. The registered list contains exactly ten tools:
+
+Call `list_drydocks` first and pass the chosen stable `drydock_id` on every other tool.
+All nine graph-scoped tools accept `drydock_id="default"` for backward compatibility;
+omission always selects the original graph, regardless of any browser's current page.
+Unknown IDs or unavailable data return tool errors; they never fall back to another graph.
+Names can change, IDs cannot. The UI owns graph creation/renaming; MCP has no such write tool.
 
 | Tool | Purpose and bound |
 |---|---|
+| `list_drydocks()` | Discover stable IDs, names and metadata versions, with `default_id` and a limit of 100. This catalog is not a graph read basis. |
 | `get_ready_work(limit=50)` | Choose executable work; open tickets with no unfinished execution blockers. Never mixes review hints into readiness. Limit 1-100. |
 | `get_ticket(ticket_id)` | Read authoritative English fields, parent/prerequisite context, related notes, child/subsequent IDs and explicit code-link metadata before editing. At most 70 context items; child/subsequent/link lists cap at 100 with separate truncation flags. |
 | `get_note(note_id)` | Read authored kind/state, bilingual abstracts, English body and content hash. |
@@ -46,7 +53,8 @@ Every tool description states when to use it. The registered list contains exact
 | `get_proposal(proposal_id, rationale_offset=0, rationale_limit=8000)` | Read the stored outcome, original basis, reviewer reason/note/amendments and paged rationale. Rationale page limit 1-16000. A cleared record reports its retained outcome with no rationale. |
 | `propose_changes(...)` | Queue one pending ticket, note or mixed proposal, returning `proposal_id` and status. Requires the captured read basis and a stable retry ID. |
 
-Graph read results have a 60,000-character content budget (JSON framing adds small overhead).
+Graph reads and proposal results identify their `drydock_id`. Graph read results have a
+60,000-character content budget (JSON framing adds small overhead).
 `items`, `total_items`, `complete` and `truncated` describe the requested result. Never infer
 that omitted data is absent. Graph read results also include the basis below. `get_proposal`
 returns `captured_basis`, not a fresh graph basis; its top-level `basis` is null and its
@@ -66,6 +74,7 @@ The same field names flow from reads through submission, storage and approval:
 
 ```json
 {
+  "drydock_id": "default",
   "revision": 12,
   "notes_revision": "<64-character notebook fingerprint>",
   "tickets": {"7": 3, "2": 1},
@@ -90,7 +99,7 @@ the notebook fingerprint for ordinary external-file changes. Arbitrary simultane
 editor writes remain outside the lock contract. An unresolved recovery attempt cannot produce
 a complete MCP graph read.
 
-For multiple reads, combine bases only when `revision`, `notes_revision` and both structural
+For multiple reads, combine bases only when `drydock_id`, `revision`, `notes_revision` and both structural
 hashes match. Union the version maps, rejecting conflicting overlapping entries, and keep
 `complete` true only if every contributing basis was complete. The union must also fit the
 50-ticket/20-note map caps; larger maps are rejected. For a larger union, retain at most those
@@ -100,6 +109,8 @@ provided basis against current data and never relabels old reads with current ve
 
 At submission, in the read-only check the graph page shows, and again under the apply writer lock:
 
+- The basis must belong to the selected Drydock, even if local IDs/revisions match another
+  graph. Historical bases without `drydock_id` remain valid only in `default`.
 - Every captured ticket version and note hash must still match, including read-only evidence.
 - Dependency/relation structure must still match. A new `assumes` link is not invisible just
   because the target ticket's own version is unchanged.
@@ -118,7 +129,8 @@ basis is silently rebased at approval.
 ## 4. Submission and concrete round trip
 
 `propose_changes` takes `operations`, `base_revision`, `notes_revision`, `basis`, `summary`,
-`rationale`, `origin` and `request_id`. The two top-level revisions must equal the basis.
+`rationale`, `origin`, `request_id` and `drydock_id`. Identity and the two top-level
+revisions must equal the basis. IDs and retry keys belong to that Drydock only.
 Summary is one line, 1-500 characters; rationale is multiline, 1-32000 characters. Total
 submitted content is bounded to 256000 characters. Oversized input is rejected rather than
 silently changing it. `origin` is `free` or `resolve`; resolve-origin batches are note-only.

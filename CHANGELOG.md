@@ -7,6 +7,8 @@ in [MLD-DEC-002](docs/decisions/002-standalone-source-extraction.md).
 
 - Added Drydock catalog and independent graph stores. Default data stays in place; HTTP,
   maintenance and proposal bases carry graph scope, with per-graph recovery and retry IDs.
+- Added MCP Drydock discovery and explicit scope to every graph tool. Results and Copilot
+  context identify the owning graph; browser selection cannot retarget an agent's calls.
 
 ## 0.1.0 — 2026-09-18
 

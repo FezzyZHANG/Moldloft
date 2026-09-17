@@ -47,7 +47,7 @@ class MCPTests(unittest.TestCase):
         self.assertIn('serverInfo', initialized['result'])
         tools = self.rpc('tools/list')['result']['tools']
         self.assertEqual({t['name'] for t in tools}, {'get_ready_work', 'get_ticket', 'get_note', 'search',
-            'get_assumptions', 'list_review_hints', 'resolve_ticket', 'get_proposal', 'propose_changes'})
+            'get_assumptions', 'list_review_hints', 'resolve_ticket', 'get_proposal', 'propose_changes', 'list_drydocks'})
         self.assertTrue(all('Call' in t['description'] for t in tools))
         ticket = self.call('get_ticket', {'ticket_id': 1})
         note = self.call('get_note', {'note_id': 'n-mapped'})
@@ -118,6 +118,65 @@ class MCPTests(unittest.TestCase):
                 response = client.post('/mcp', headers={'Accept': 'application/json, text/event-stream'},
                     json={'jsonrpc': '2.0', 'id': 1, 'method': 'tools/list'})
                 self.assertEqual(response.status_code, 200, response.text)
+
+    def test_every_tool_selects_a_drydock_and_ui_selection_cannot_retarget_mcp(self):
+        metadata = self.app.state.drydocks.create('Parallel work', str(uuid.uuid4()))
+        dock = metadata['id']
+        context = self.app.state.drydocks.get(dock)
+        context.store.mutate([{'op': 'create', 'fields': {'title': 'Other premise'}}])
+        context.notes.write('n-mapped', {'title': 'Other note', 'kind': 'assumption', 'state': 'proposed',
+            'relations': [{'type': 'assumes', 'target': 'ticket:1'}]}, None, {1})
+        self.assertEqual(len(self.call('list_drydocks')['items']), 2)
+        schemas = self.rpc('tools/list')['result']['tools']
+        for tool in schemas:
+            if tool['name'] != 'list_drydocks':
+                self.assertEqual(tool['inputSchema']['properties']['drydock_id']['default'], 'default')
+        calls = [('get_ready_work', {}), ('get_ticket', {'ticket_id': 1}), ('get_note', {'note_id': 'n-mapped'}),
+                 ('search', {'query': 'Other'}), ('get_assumptions', {'ticket_id': 1}),
+                 ('list_review_hints', {}), ('resolve_ticket', {'ticket_id': 1})]
+        for name, args in calls:
+            result = self.call(name, {**args, 'drydock_id': dock})
+            self.assertEqual(result['drydock_id'], dock)
+            self.assertEqual(result['basis']['drydock_id'], dock)
+            self.assertNotIn('Bounded memory premise', json.dumps(result))
+        self.client.get('/graph', params={'drydock': dock})
+        self.assertEqual(self.call('get_ticket', {'ticket_id': 1})['items'][0]['title'], 'Bounded memory premise')
+
+        captured = self.call('get_ticket', {'ticket_id': 1, 'drydock_id': dock})['basis']
+        arguments = {'drydock_id': dock, 'operations': [{'op': 'update', 'ticket_id': 1, 'fields': {'title': 'Reviewed other'}}],
+            'basis': captured, 'base_revision': captured['revision'], 'notes_revision': captured['notes_revision'],
+            'summary': 'Other graph', 'rationale': 'Scoped read and review', 'origin': 'free', 'request_id': str(uuid.uuid4())}
+        result = self.call('propose_changes', arguments)
+        self.assertEqual(result['drydock_id'], dock)
+        self.assertEqual(self.call('propose_changes', arguments), result)
+        self.assertEqual(context.store.graph()['tickets'][0]['title'], 'Other premise')
+        review = self.client.post('/api/proposals/' + result['proposal_id'] + '/apply', params={'drydock': dock}, json={})
+        self.assertEqual(review.status_code, 200, review.text)
+        outcome = self.call('get_proposal', {'proposal_id': result['proposal_id'], 'drydock_id': dock})
+        self.assertEqual(outcome['status'], 'applied')
+        self.assertEqual(outcome['drydock_id'], dock)
+        self.assertEqual(self.store.graph()['tickets'][0]['title'], 'Bounded memory premise')
+        wrong = self.rpc('tools/call', {'name': 'get_proposal', 'arguments': {'proposal_id': result['proposal_id']}})
+        self.assertTrue(wrong['result']['isError'])
+
+    def test_wrong_drydock_basis_unknown_id_and_missing_data_are_mcp_errors(self):
+        dock = self.app.state.drydocks.create('Another', str(uuid.uuid4()))['id']
+        captured = self.call('get_ready_work')['basis']
+        arguments = {'drydock_id': dock, 'operations': [{'op': 'create', 'fields': {'title': 'Wrong graph'}}],
+            'basis': captured, 'base_revision': captured['revision'], 'notes_revision': captured['notes_revision'],
+            'summary': 'Wrong graph', 'rationale': 'Must fail', 'origin': 'free', 'request_id': str(uuid.uuid4())}
+        result = self.rpc('tools/call', {'name': 'propose_changes', 'arguments': arguments})
+        self.assertTrue(result['result']['isError'])
+        self.assertFalse(self.app.state.drydocks.get(dock).proposals.list()['items'])
+        for ident in ('', '../default', 'd-' + '0' * 32):
+            result = self.rpc('tools/call', {'name': 'get_ready_work', 'arguments': {'drydock_id': ident}})
+            self.assertTrue(result['result']['isError'])
+        absent = self.app.state.drydocks.create('Unavailable', str(uuid.uuid4()))['id']
+        _, notebook = self.app.state.drydocks.paths(absent)
+        notebook.rmdir()
+        result = self.rpc('tools/call', {'name': 'get_ready_work', 'arguments': {'drydock_id': absent}})
+        self.assertTrue(result['result']['isError'])
+        self.assertFalse(notebook.exists())
 
 
 if __name__ == '__main__': unittest.main()

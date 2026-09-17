@@ -297,7 +297,7 @@ SDK dependencies leave ordinary ticket editing usable. Verify `initialize` and `
 MCP POST requests: an ordinary browser GET is not a protocol health check. The normal lifespan
 owns the MCP session manager and creates a fresh one on restart.
 
-[MCP.md](MCP.md) documents nine bounded tools: eight reads plus `propose_changes`, which
+[MCP.md](MCP.md) documents ten bounded tools: `list_drydocks`, eight graph reads and `propose_changes`, which
 queues a ticket, note or mixed batch for human review. The first review page was
 withdrawn on 2026-09-13 after the owner's review; the redesigned #41 reviews proposals inside
 the graph page (see [Reviewing agent proposals](#reviewing-agent-proposals)). Mixed apply

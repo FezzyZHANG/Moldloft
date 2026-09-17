@@ -26,7 +26,7 @@ def envelope(graph, items, *, ticket_ids=(), note_ids=(), complete=False, limit=
     truncated = len(output) < len(items) or any(k.endswith('_truncated') and v for k, v in metadata.items())
     if truncated:
         captured['complete'] = False
-    return {'items': output, 'basis': captured, 'truncated': truncated,
+    return {'drydock_id': captured['drydock_id'], 'items': output, 'basis': captured, 'truncated': truncated,
             'complete': not truncated and not graph.get('notes_errors'), 'total_items': len(items), **metadata}
 
 
@@ -139,7 +139,7 @@ class ReadTools:
                         candidate_method='lexical title/abstract overlap; unlinked suggestions are not premises')
 
 
-def create_mcp(store_getter):
+def create_mcp(store_getter, drydock_lister):
     from mcp.server.fastmcp import FastMCP
     from mcp.server.transport_security import TransportSecuritySettings
     allowed = [host.strip() for host in os.environ.get('TICKETS_MCP_ALLOWED_HOSTS', '').split(',') if host.strip()]
@@ -149,67 +149,82 @@ def create_mcp(store_getter):
         security = TransportSecuritySettings(allowed_hosts=hosts, allowed_origins=[f'http://{host}' for host in hosts])
     mcp = FastMCP('Moldloft', json_response=True, stateless_http=True, streamable_http_path='/mcp',
                  max_request_body_size=1_000_000, transport_security=security,
-                 instructions='Read bounded ticket/note context and its basis before proposing. Preserve uncertainty. '
+                 instructions='Call list_drydocks to choose a graph, then pass its stable drydock_id on every scoped call. '
+                 'Omission always means default, never the browser selection. Read bounded ticket/note context '
+                 'and its basis before proposing. Preserve uncertainty. '
                  'Submit ticket, note or mixed edits for human review in the graph page; no tool approves or applies. '
                  'A rejected outcome carries the reviewer reason; read it before proposing again. '
                  'English ticket fields are authoritative; cached translations are views, not proposal evidence. '
-                 'Combine reads only when revision and notes_revision match; otherwise refresh one coherent basis.')
+                 'Combine reads only within one drydock_id when revision and notes_revision match; '
+                 'otherwise refresh one coherent basis. No tool creates, renames or switches graphs for the user.')
+
+    async def read(method, drydock_id, *arguments):
+        # Resolving a graph may open its DB and recover pending writes; keep that I/O
+        # off the event loop and pin the target for the entire call.
+        return await asyncio.to_thread(lambda: getattr(ReadTools(store_getter(drydock_id)), method)(*arguments))
 
     @mcp.tool()
-    async def get_ready_work(limit: int = 50) -> dict:
+    async def list_drydocks() -> dict:
+        """Call first to discover stable graph IDs and names (at most 100). Select drydock_id explicitly on subsequent tools; this is a catalog, not a proposal basis."""
+        return await asyncio.to_thread(drydock_lister)
+
+    @mcp.tool()
+    async def get_ready_work(limit: int = 50, drydock_id: str = 'default') -> dict:
         """Call to choose the next executable work. Returns open tickets without execution blockers only."""
-        return await asyncio.to_thread(ReadTools(store_getter()).get_ready_work, limit)
+        return await read('get_ready_work', drydock_id, limit)
 
     @mcp.tool()
-    async def get_ticket(ticket_id: int) -> dict:
+    async def get_ticket(ticket_id: int, drydock_id: str = 'default') -> dict:
         """Call before modifying work; read its fields, dependency context and immutable proposal basis."""
-        return await asyncio.to_thread(ReadTools(store_getter()).get_ticket, ticket_id)
+        return await read('get_ticket', drydock_id, ticket_id)
 
     @mcp.tool()
-    async def get_note(note_id: str) -> dict:
+    async def get_note(note_id: str, drydock_id: str = 'default') -> dict:
         """Call to inspect a premise, question, evidence or decision with its authored state and content hash."""
-        return await asyncio.to_thread(ReadTools(store_getter()).get_note, note_id)
+        return await read('get_note', drydock_id, note_id)
 
     @mcp.tool()
-    async def search(query: str, kind: str | None = None, limit: int = 50) -> dict:
+    async def search(query: str, kind: str | None = None, limit: int = 50, drydock_id: str = 'default') -> dict:
         """Call before creating work to find existing tickets or bilingual note abstracts. Search uses global guards."""
-        return await asyncio.to_thread(ReadTools(store_getter()).search, query, kind, limit)
+        return await read('search', drydock_id, query, kind, limit)
 
     @mcp.tool()
-    async def get_assumptions(ticket_id: int) -> dict:
+    async def get_assumptions(ticket_id: int, drydock_id: str = 'default') -> dict:
         """Call before building on a ticket to read direct/inherited premises and their states; support is not proof."""
-        return await asyncio.to_thread(ReadTools(store_getter()).get_assumptions, ticket_id)
+        return await read('get_assumptions', drydock_id, ticket_id)
 
     @mcp.tool()
-    async def list_review_hints(limit: int = 50) -> dict:
+    async def list_review_hints(limit: int = 50, drydock_id: str = 'default') -> dict:
         """Call to review work affected by changed or unadopted premises. These hints never change execution readiness."""
-        return await asyncio.to_thread(ReadTools(store_getter()).list_review_hints, limit)
+        return await read('list_review_hints', drydock_id, limit)
 
     @mcp.tool()
-    async def resolve_ticket(ticket_id: int, limit: int = 20) -> dict:
+    async def resolve_ticket(ticket_id: int, limit: int = 20, drydock_id: str = 'default') -> dict:
         """Call when premise mapping is missing/suspect. Returns factual mappings separately from unlinked lexical candidates; never writes or builds operations."""
-        return await asyncio.to_thread(ReadTools(store_getter()).resolve_ticket, ticket_id, limit)
+        return await read('resolve_ticket', drydock_id, ticket_id, limit)
 
     @mcp.tool()
-    async def get_proposal(proposal_id: str, rationale_offset: int = 0, rationale_limit: int = 8000) -> dict:
+    async def get_proposal(proposal_id: str, rationale_offset: int = 0, rationale_limit: int = 8000,
+                           drydock_id: str = 'default') -> dict:
         """Call to read an approval outcome or recover the stored reason. Page rationale explicitly; this read cannot be used as a new proposal basis."""
         if rationale_offset < 0 or not 1 <= rationale_limit <= 16000:
             raise DomainError('Invalid rationale page')
-        proposal = await asyncio.to_thread(Proposals(store_getter()).get, proposal_id)
+        proposal = await asyncio.to_thread(lambda: Proposals(store_getter(drydock_id)).get(proposal_id))
         text = proposal['rationale']
         result = {key: proposal[key] for key in ('id', 'source', 'summary', 'origin', 'status', 'created_at', 'applied_revision', 'result', 'stale_reason')}
-        result.update(captured_basis=proposal['basis'], rationale=text[rationale_offset:rationale_offset+rationale_limit],
+        result.update(drydock_id=drydock_id, captured_basis=proposal['basis'], rationale=text[rationale_offset:rationale_offset+rationale_limit],
             rationale_offset=rationale_offset, rationale_total=len(text),
             truncated=rationale_offset+rationale_limit < len(text), basis=None)
         return result
 
     @mcp.tool()
     async def propose_changes(operations: list[dict], base_revision: int, notes_revision: str, basis: dict,
-                        summary: str, rationale: str, origin: str, request_id: str) -> dict:
+                        summary: str, rationale: str, origin: str, request_id: str, drydock_id: str = 'default') -> dict:
         """Call after coherent reads to queue ticket, note or mixed edits for human review. Preserve the read basis; retry the same request ID and content after uncertainty. Never applies."""
         if basis.get('revision') != base_revision or basis.get('notes_revision') != notes_revision:
             raise DomainError('Base revisions must match the captured read basis')
-        proposal = await asyncio.to_thread(Proposals(store_getter()).submit, operations, basis, summary, rationale, origin, request_id)
-        return {'proposal_id': proposal['id'], 'status': proposal['status']}
+        proposal = await asyncio.to_thread(lambda: Proposals(store_getter(drydock_id)).submit(
+            operations, basis, summary, rationale, origin, request_id))
+        return {'drydock_id': drydock_id, 'proposal_id': proposal['id'], 'status': proposal['status']}
 
     return mcp

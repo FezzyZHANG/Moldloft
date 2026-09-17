@@ -94,7 +94,7 @@ def context_for(graph, selected_id=None, references=None, selected_note=None):
             if parent not in included:
                 ancestors.add(parent)
             parent = by_id[parent]["parent_id"]
-    context = {"revision": graph["revision"], "tickets": [
+    context = {"drydock_id": graph.get("drydock_id", "default"), "revision": graph["revision"], "tickets": [
         {k: by_id[i][k] for k in sorted(FIELDS | {"id", "version"})} for i in sorted(included)],
         "ancestors": [{"id": i, "parent_id": by_id[i]["parent_id"], "group_name": by_id[i]["group_name"]} for i in sorted(ancestors)],
         "edges": [e for e in graph["edges"] if e["blocker_id"] in included and e["blocked_id"] in included],
@@ -162,7 +162,8 @@ def prepare(store, messages, selected_id, references, selected_note=None):
 
 def events(store, prepared, streamer=default_streamer, cancel=None):
     graph, context, included, messages = prepared
-    yield {"type": "context", "ticket_ids": sorted(included), "note_ids": [n["id"] for n in context["notes"]], "revision": graph["revision"]}
+    yield {"type": "context", "drydock_id": store.drydock_id, "ticket_ids": sorted(included),
+           "note_ids": [n["id"] for n in context["notes"]], "revision": graph["revision"]}
     operations = []
     try:
         completed = False
