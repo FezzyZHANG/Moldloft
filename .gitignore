@@ -1,0 +1,24 @@
+# Private working state; source clones do not restore a workspace.
+/data/
+/workspace/
+/.env
+/.env.*
+!/.env.example
+/config/repositories.json
+*.db
+*.db-wal
+*.db-shm
+*.sqlite3
+*.pem
+*.key
+# Reproducible installation, build and test outputs.
+.venv/
+dist/
+build/
+*.egg-info/
+__pycache__/
+*.pyc
+node_modules/
+.verification/
+notes/.note-*.tmp
+review/.note-*.tmp

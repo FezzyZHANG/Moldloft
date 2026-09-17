@@ -1,0 +1,6 @@
+* text=auto eol=lf
+
+# Preserve the pinned upstream bytes and their original whitespace. These two
+# distributions are verified by SHA-256; project-authored files keep normal checks.
+src/tickets/static/vendor/elk/elk-api.js -text -whitespace
+src/tickets/static/vendor/elk/elk-worker.min.js -text -whitespace

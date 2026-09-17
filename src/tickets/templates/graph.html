@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>依赖图 · Moldloft 工单</title>
+  <link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/graph.css">
+  <script src="/static/vendor/elk/elk-api.js" defer></script>
+  <script type="module" src="/static/graph.js"></script>
+</head>
+<body class="dag-app" data-translation-enabled="{{ 'true' if translation_enabled else 'false' }}">
+  <header class="dag-top"><a class="brand" href="/">Moldloft<span>工单</span></a>
+    <nav aria-label="视图"><a href="/">列表</a><strong>依赖图</strong></nav>
+    {% if demo %}<span class="demo-label">演示数据</span>{% endif %}
+    <span id="connection" role="status">连接中</span><button id="proposal-count" class="ghost" hidden>待审提案 0</button><button id="new-ticket">＋ 新建工单</button>
+  </header>
+  <div id="notice" role="alert" hidden></div>
+  <main class="workspace">
+    <aside class="navigator" aria-label="工单导航">
+      <label>查找工单与笔记<input id="search" type="search" placeholder="编号、标题或双语摘要"></label>
+      <label>状态<select id="status-filter"><option value="">全部状态</option value="open">待处理</option><option value="in_progress">处理中</option><option value="done">已完成</option><option value="closed">已关闭</option></select></label>
+      <button class="ghost" id="clear-filter">所有工单组</button>
+      <div id="tree"></div>
+      <div class="section-header notes-heading"><h2>笔记</h2><button id="new-note" class="ghost">＋ 新建</button></div>
+      <p class="muted">假设 · 问题 · 灵感 · 证据 · 决定</p>
+      <div id="notes-tree"></div><p id="notes-warning" role="alert" hidden></p>
+      <div class="section-header proposals-heading"><h2>提案</h2><span id="proposals-count" class="muted"></span></div>
+      <p class="muted">agent 提交 · 按工单组归并 · 在右侧审阅</p>
+      <div id="proposals-tree"></div><p id="proposals-warning" role="alert" hidden></p>
+    </aside>
+    <section class="graph-pane" aria-label="工单依赖图">
+      <div class="graph-toolbar"><span id="graph-count"></span><span class="spacer"></span>
+        <button class="ghost" id="collapse-groups">收起组</button><button class="ghost" id="expand-all">展开</button>
+        <button class="ghost" id="zoom-out" aria-label="缩小">−</button><button class="ghost" id="zoom-in" aria-label="放大">＋</button><button class="ghost" id="fit">适应视图</button>
+      </div>
+      <div class="graph-scope"><button class="ghost" id="local-graph" aria-pressed="false">局部图谱</button><label>深度 <select id="local-depth" aria-label="局部图谱深度"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label><label><input id="show-notes" type="checkbox" checked>显示笔记</label><span id="scope-label">全局</span></div>
+      <div id="relation-legend" class="relation-legend" aria-label="关系类型筛选"></div>
+      <p id="graph-hint">箭头指向后续工单 · 父子容器表示任务拆解</p>
+      <div class="canvas-host"><svg id="dag" role="group" aria-label="可交互的工单图" tabindex="0"></svg><p id="empty-graph" hidden>这里还没有工单。新建一项，或调整筛选。</p><span id="layout-status" role="status"></span></div>
+      <footer class="graph-footer"><span>始终自动排列</span><span>仅「已完成」解除阻塞 · 筛选不改变依赖</span></footer>
+    </section>
+    <aside class="rightbar" aria-label="编辑与 Copilot">
+      <section id="editor-region" class="editor-region" aria-label="工单编辑区">
+        <header class="section-header"><h2 id="editor-heading">工单</h2><span id="save-state" role="status"></span></header>
+        <p id="select-hint">选择节点查看与编辑，离开编辑区时保存。</p>
+        <form id="ticket-form" hidden>
+          <label>标题<input type="text" name="title" maxlength="200" required></label>
+          <div class="two-fields"><label>状态<select name="status"><option value="open">待处理</option><option value="in_progress">处理中</option><option value="done">已完成</option><option value="closed">已关闭</option></select></label><label>优先级<select name="priority"><option value="low">低</option><option value="medium">中</option><option value="high">高</option></select></label></div>
+          <div class="two-fields"><label>父工单<select name="parent_id"></select></label><label>工单组<input type="text" name="group_name" maxlength="80" list="group-list"></label></div>
+          <datalist id="group-list"></datalist>
+          <label>描述<textarea name="description" rows="4" maxlength="20000"></textarea></label>
+          <details><summary>技术要点</summary><textarea name="tech_notes" aria-label="技术要点" class="mono" rows="5" maxlength="20000"></textarea></details>
+          <details id="translation"><summary>中文翻译 <span id="translation-state"></span></summary><p id="translation-title"></p><p id="translation-description"></p><button type="button" class="ghost" id="translate-retry">重新翻译</button></details>
+          <div id="conflict" hidden><strong>服务器版本已经变化</strong><pre id="conflict-current"></pre><button type="button" class="ghost" id="use-server">采用服务器版本</button><button type="button" id="keep-draft">保留我的修改并重试</button></div>
+          <div class="editor-actions"><button type="submit" id="save-now">保存</button><button type="button" class="ghost" id="new-child">＋ 子工单</button><button type="button" class="ghost" id="connect-node">连接后续</button><button type="button" class="danger" id="delete-ticket">删除</button></div>
+        </form>
+        <form id="note-form" hidden>
+          <small id="note-path" class="muted"></small>
+          <label>标题<input name="title" maxlength="200" required></label>
+          <div class="two-fields"><label>类型<select name="kind"></select></label><label>状态<select name="state"></select></label></div>
+          <small id="note-adoption" class="muted" hidden>前提文字已改变，原采纳对应旧版本；请复核后重新采纳。</small>
+          <div class="note-abstracts">
+            <label>中文摘要<textarea name="abstract_zh" lang="zh-CN" rows="2" maxlength="600" aria-describedby="note-abstract-hint" placeholder="一段浓缩灵感，保留不确定性与关键 English terms。"></textarea></label>
+            <label>English abstract<textarea name="abstract_en" lang="en" rows="2" maxlength="1200" aria-describedby="note-abstract-hint" placeholder="One compact paragraph: the idea, uncertainty, and what would move it forward."></textarea></label>
+            <small id="note-abstract-hint" class="muted"></small>
+          </div>
+          <label>正文 · English / Markdown<textarea name="body" lang="en" rows="8" maxlength="20000"></textarea></label>
+          <div id="note-conflict" hidden><strong>磁盘上的笔记已变化，草稿保留</strong><pre id="note-conflict-current"></pre><button type="button" class="ghost" id="note-use-server">采用磁盘版本</button><button type="button" id="note-keep-draft">保留修改并重试</button></div>
+          <div class="editor-actions"><button type="submit" id="note-save">保存</button><button type="button" class="ghost" id="note-cancel" hidden>取消</button></div>
+          <h3>此笔记的关系</h3><div id="note-relations"></div>
+          <div class="two-fields"><select id="note-relation-type" aria-label="笔记关系类型"></select><select id="note-relation-target" aria-label="笔记关系目标"></select></div>
+          <button type="button" class="ghost" id="note-add-relation">添加关系</button>
+          <small id="note-relation-help" class="muted"></small>
+        </form>
+        <form id="review-form" hidden>
+          <strong id="review-summary"></strong>
+          <p id="review-meta" class="muted"></p>
+          <p id="review-check" role="status"></p>
+          <details open><summary>提交理由</summary><pre id="review-rationale" class="prose"></pre></details>
+          <div id="review-sections"></div>
+          <details id="review-edit"><summary>修改后接受</summary><p class="muted">只能修改提案自己设定的文本字段；修改与 agent 的理由一起记录在结果里。</p><div id="review-edits"></div></details>
+          <label>审阅说明<textarea id="review-note" rows="2" maxlength="4000" placeholder="拒绝时必填理由；应用时可留说明，agent 会读到"></textarea></label>
+          <div class="editor-actions"><button type="button" id="review-apply">应用整批</button><button type="button" id="review-reject" class="ghost">拒绝</button><button type="button" id="review-close" class="ghost">关闭</button></div>
+          <small id="review-file" class="muted"></small>
+        </form>
+        <div id="knowledge-links" hidden><div class="section-header"><h3>关联与反向链接</h3><button class="ghost" id="capture-note">＋ 笔记</button></div><p id="premise-warning" hidden></p><div id="backlinks"></div></div>
+        <div id="relationships" hidden><h3>依赖关系</h3><div id="dependency-list"></div><div class="inline-control"><select id="blocker-picker" aria-label="选择前置工单"></select><button id="add-blocker" class="ghost">添加前置</button></div></div>
+        <div id="code-links" hidden><div class="section-header"><h3>代码关联</h3><button class="ghost" id="add-link">＋ 关联</button></div><div id="link-list"></div><pre id="code-preview" hidden></pre></div>
+      </section>
+      <section id="copilot-region" class="copilot-region" aria-label="Copilot 聊天区">
+        <header class="section-header"><h2>Copilot <small>{{ copilot_label }}</small></h2><button id="new-chat" class="ghost">清空</button></header>
+        <div id="chat-context" class="context-chips"></div><small class="chat-note">工单与关联笔记 · Copilot 修改工单，笔记作为只读上下文 · 聊天仅保留在本页</small>
+        <div id="messages" aria-live="polite"></div>
+        <div id="proposal" hidden><header class="section-header"><strong>修改预览</strong><span id="proposal-state"></span></header><div id="proposal-changes"></div><div class="editor-actions"><button id="apply-proposal">应用整批修改</button><button id="reject-proposal" class="ghost">拒绝</button></div></div>
+        <form id="chat-form"><label class="sr-only" for="chat-input">发送给 Copilot</label><textarea id="chat-input" rows="3" maxlength="12000" placeholder="描述要做的修改；用 #编号 添加上下文"></textarea><div class="editor-actions"><span id="chat-state" role="status"></span><button type="button" id="stop-chat" class="ghost" hidden>停止</button><button id="send-chat" type="submit">发送 ↑</button></div></form>
+      </section>
+    </aside>
+  </main>
+  <dialog id="link-dialog"><form id="link-form"><h2>关联代码</h2><label>仓库<select name="repo">{% for repo in repo_names %}<option value="{{ repo }}">{{ repo }}</option>{% else %}<option value="" disabled selected>未配置仓库</option>{% endfor %}</select></label><label>类型<select name="kind"><option value="file">文件与行号</option><option value="commit">提交</option><option value="branch">分支</option></select></label><label>分支或提交<input type="text" name="ref" value="HEAD" list="ref-list" required></label><datalist id="ref-list"></datalist><label>文件路径<input type="text" name="path" placeholder="src/example.py"></label><div class="two-fields"><label>起始行<input type="number" name="start_line" min="1" value="1"></label><label>结束行<input type="number" name="end_line" min="1"></label></div><p id="link-error" role="alert"></p><div class="editor-actions"><button type="submit">添加关联</button><button type="button" id="close-link" class="ghost">取消</button></div></form></dialog>
+</body></html>

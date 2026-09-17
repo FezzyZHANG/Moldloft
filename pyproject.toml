@@ -1,0 +1,34 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "moldloft"
+version = "0.1.0"
+description = "A local ticket dependency graph and Markdown exploration notebook"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.115,<1",
+    "uvicorn>=0.34,<1",
+    "sqlalchemy>=2.0,<3",
+    "jinja2>=3.1,<4",
+    "python-multipart>=0.0.20,<1",
+    "mcp>=1.30,<2",
+]
+
+[project.optional-dependencies]
+dev = ["httpx>=0.28,<1", "build>=1.2,<2"]
+
+[project.scripts]
+moldloft = "tickets.__main__:main"
+
+[tool.setuptools]
+include-package-data = false
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["tickets"]
+
+[tool.setuptools.package-data]
+tickets = ["templates/*.html", "static/*.js", "static/*.css", "static/layouts/*.js", "static/vendor/elk/*"]

@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% block title %}工单列表{% endblock %}
+{% block content %}
+<h1>工单{% if active_group %} · <span class="grp">{{ active_group }}</span>{% endif %}</h1>
+
+{% set qgroup = '&group=' ~ active_group|urlencode if active_group else '' %}
+<div class="filters">
+  <a href="/?{{ qgroup[1:] }}" class="{{ 'on' if not active_status }}">全部</a>
+  {% for s in STATUSES %}
+  <a href="/?status={{ s }}{{ qgroup }}" class="{{ 'on' if active_status == s }}">
+    {{ {'open':'待处理','in_progress':'处理中','done':'已完成','closed':'已关闭'}[s] }} ({{ counts[s] }})
+  </a>
+  {% endfor %}
+</div>
+
+{% if groups %}
+{% set qstatus = 'status=' ~ active_status ~ '&' if active_status else '' %}
+<div class="filters groups">
+  <span class="flabel">工单组</span>
+  <a href="/?{{ qstatus[:-1] }}" class="{{ 'on' if not active_group }}">不限</a>
+  {% for g, n in groups %}
+  <a href="/?{{ qstatus }}group={{ g|urlencode }}" class="{{ 'on' if active_group == g }}">{{ g }} ({{ n }})</a>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="new">
+  <h2>新建工单</h2>
+  <form class="row" method="post" action="/tickets">
+    <label>标题
+      <input type="text" name="title" required maxlength="200">
+    </label>
+    <label>工单组
+      <input type="text" name="group_name" maxlength="80" list="group-list"
+             value="{{ active_group }}" placeholder="可选">
+    </label>
+    <label>优先级
+      <select name="priority">
+        {% for p in PRIORITIES %}
+        <option value="{{ p }}" {{ 'selected' if p == 'medium' }}>
+          {{ {'low':'低','medium':'中','high':'高'}[p] }}
+        </option>
+        {% endfor %}
+      </select>
+    </label>
+    <label style="flex:1 1 100%">描述
+      <textarea name="description" placeholder="可选"></textarea>
+    </label>
+    <label style="flex:1 1 100%">技术要点
+      <textarea name="tech_notes" class="mono"
+                placeholder="可选 —— 相关文件、函数、坑。写给接手的人（通常是 Claude）"></textarea>
+    </label>
+    <button type="submit">创建</button>
+  </form>
+</div>
+
+<datalist id="group-list">
+  {% for g, n in groups %}<option value="{{ g }}"></option>{% endfor %}
+</datalist>
+
+{% if tickets %}
+<table>
+  <thead>
+    <tr><th>#</th><th>标题</th><th>组</th><th>状态</th><th>优先级</th><th>更新时间</th></tr>
+  </thead>
+  <tbody>
+    {% for t in tickets %}
+    <tr>
+      <td>{{ t.id }}</td>
+      <td>
+        <a href="/tickets/{{ t.id }}">{{ t.title }}</a>
+        {% if t.title_zh %}<div class="translation">{{ t.title_zh }}</div>{% endif %}
+      </td>
+      <td>
+        {% if t.group_name %}
+        <a class="grp" href="/?group={{ t.group_name|urlencode }}">{{ t.group_name }}</a>
+        {% endif %}
+        {% if t.tech_notes %}<span class="has-notes" title="有技术要点">◆</span>{% endif %}
+      </td>
+      <td><span class="pill {{ t.status }}">
+        {{ {'open':'待处理','in_progress':'处理中','done':'已完成','closed':'已关闭'}[t.status] }}
+      </span></td>
+      <td><span class="pri {{ t.priority }}">
+        {{ {'low':'低','medium':'中','high':'高'}[t.priority] }}
+      </span></td>
+      <td class="stamp">{{ t.updated_at.strftime('%Y-%m-%d %H:%M') }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="empty">还没有工单{{ '（当前筛选下）' if active_status or active_group else '' }}</div>
+{% endif %}
+{% endblock %}

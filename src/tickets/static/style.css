@@ -1,0 +1,72 @@
+:root{
+  --ground:#E4E1D6;--panel:#EDEBE2;--panel2:#DAD6C8;--rule:#BDB8A6;--rule2:#CFCABA;
+  --ink:#1B2422;--ink2:#4E5A56;--dim:#7E8781;--brass:#8A5D1B;--brass2:#A87428;
+  --verd:#2F7360;--rust:#9E4330;
+  --fl:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+  --fm:Consolas,ui-monospace,monospace;
+}
+@media (prefers-color-scheme:dark){:root{
+  --ground:#0D1416;--panel:#121C1E;--panel2:#182427;--rule:#26383A;--rule2:#1C2A2C;
+  --ink:#DCE0D7;--ink2:#97A6A1;--dim:#6B7A76;--brass:#C4914A;--brass2:#E0AE63;
+  --verd:#5CA88F;--rust:#C4634A;
+}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--fl);
+  font-size:15px;line-height:1.6}
+.wrap{max-width:56rem;margin:0 auto;padding:1.6rem 1.2rem 4rem}
+.top{border-bottom:2px solid var(--brass);padding-bottom:.8rem;margin-bottom:1.4rem}
+.brand{font-size:1.3rem;font-weight:600;color:var(--ink);text-decoration:none}
+.brand span{color:var(--brass);font-size:.8rem;margin-left:.5rem;letter-spacing:.1em}
+h1{font-size:1.1rem;margin:0 0 1rem}
+.filters{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:1rem}
+.filters a{font-family:var(--fm);font-size:.78rem;color:var(--ink2);text-decoration:none;
+  border:1px solid var(--rule);padding:.3rem .7rem;background:var(--panel)}
+.filters a.on{border-color:var(--brass);color:var(--brass2);background:var(--panel2)}
+.new{background:var(--panel);border:1px solid var(--rule);padding:1rem 1.1rem;margin-bottom:1.4rem}
+.new h2{margin:0 0 .7rem;font-size:.85rem;color:var(--dim);letter-spacing:.08em}
+form.row{display:flex;flex-wrap:wrap;gap:.5rem}
+label{display:flex;flex-direction:column;gap:.25rem;font-size:.72rem;color:var(--dim)}
+input[type=text], textarea, select{
+  font-family:var(--fl);font-size:.88rem;padding:.4rem .5rem;border:1px solid var(--rule);
+  background:var(--ground);color:var(--ink)}
+textarea{resize:vertical;min-height:4.5rem;width:100%}
+.new label:first-child{flex:1 1 16rem}
+button{font-family:var(--fl);font-size:.85rem;padding:.45rem 1rem;border:1px solid var(--brass);
+  background:var(--brass);color:#fff;cursor:pointer}
+button:hover{background:var(--brass2);border-color:var(--brass2)}
+button.danger{background:var(--rust);border-color:var(--rust)}
+button.ghost{background:transparent;color:var(--ink2);border-color:var(--rule)}
+table{width:100%;border-collapse:collapse;font-size:.88rem}
+th{text-align:left;font-size:.68rem;letter-spacing:.1em;color:var(--dim);
+  border-bottom:1px solid var(--rule);padding:.4rem .5rem .4rem 0}
+td{padding:.55rem .5rem;border-bottom:1px solid var(--rule2);vertical-align:top}
+td a{color:var(--ink);text-decoration:none;font-weight:500}
+td a:hover{color:var(--brass2)}
+.empty{color:var(--dim);padding:2rem 0;text-align:center;font-size:.9rem}
+.pill{display:inline-block;font-family:var(--fm);font-size:.7rem;padding:.15rem .5rem;
+  border:1px solid var(--rule);color:var(--ink2)}
+.pill.open{border-color:var(--brass);color:var(--brass2)}
+.pill.in_progress{border-color:#5b7fb8;color:#5b7fb8}
+.pill.done{border-color:var(--verd);color:var(--verd)}
+.pill.closed{color:var(--dim)}
+.pri.high{color:var(--rust);font-weight:600}
+.pri.medium{color:var(--ink2)}
+.pri.low{color:var(--dim)}
+.detail{background:var(--panel);border:1px solid var(--rule);padding:1.2rem 1.3rem}
+.detail form{display:flex;flex-direction:column;gap:.8rem}
+.meta{display:flex;gap:1rem;flex-wrap:wrap}
+.meta label{flex:1 1 8rem}
+.actions{display:flex;gap:.5rem;justify-content:space-between;margin-top:.4rem}
+.back{display:inline-block;margin-bottom:1rem;font-size:.8rem;color:var(--dim);text-decoration:none}
+.back:hover{color:var(--brass2)}
+.stamp{font-family:var(--fm);font-size:.72rem;color:var(--dim);margin-top:.6rem}
+.translation{font-size:.82rem;color:var(--ink2);margin:.15rem 0 0;font-style:italic}
+.filters .flabel{font-family:var(--fm);font-size:.68rem;letter-spacing:.1em;color:var(--dim);
+  align-self:center;padding-right:.2rem}
+.filters.groups{margin-top:-.4rem}
+.grp{font-family:var(--fm);font-size:.72rem;color:var(--verd);text-decoration:none;
+  border-bottom:1px dotted var(--verd)}
+h1 .grp{border:0;font-size:.8rem}
+.has-notes{color:var(--brass2);font-size:.6rem;margin-left:.35rem}
+textarea.mono{font-family:var(--fm);font-size:.8rem;min-height:6rem;
+  background:var(--panel2);color:var(--ink)}

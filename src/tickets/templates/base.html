@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}工单{% endblock %} · Moldloft</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="/">Moldloft<span>工单</span></a>
+      {% if demo %}<span>演示数据</span>{% endif %}
+      <a class="back" href="/graph" style="float:right">依赖图 →</a>
+    </header>
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

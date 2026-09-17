@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}#{{ ticket.id }} {{ ticket.title }}{% endblock %}
+{% block content %}
+<a class="back" href="/">&larr; 返回列表</a>
+{% if ticket.group_name %}
+<a class="back grp" href="/?group={{ ticket.group_name|urlencode }}"
+   style="margin-left:.8rem">{{ ticket.group_name }}</a>
+{% endif %}
+<div class="detail">
+  <form method="post" action="/tickets/{{ ticket.id }}">
+    <input type="hidden" name="version" value="{{ ticket.version }}">
+    <input type="hidden" name="revision" value="{{ revision }}">
+    <input type="hidden" name="request_id" value="{{ request_id }}">
+    <label>标题
+      <input type="text" name="title" value="{{ ticket.title }}" required maxlength="200">
+    </label>
+    {% if ticket.title_zh %}<p class="translation">{{ ticket.title_zh }}</p>{% endif %}
+    <label>描述
+      <textarea name="description">{{ ticket.description }}</textarea>
+    </label>
+    {% if ticket.description_zh %}<p class="translation">{{ ticket.description_zh }}</p>{% endif %}
+    <label>技术要点
+      <textarea name="tech_notes" class="mono" rows="10"
+                placeholder="相关文件、函数、坑。写给接手的人（通常是 Claude）">{{ ticket.tech_notes }}</textarea>
+    </label>
+    <div class="meta">
+      <label>工单组
+        <input type="text" name="group_name" maxlength="80" list="group-list"
+               value="{{ ticket.group_name }}" placeholder="可选" {{ 'readonly' if ticket.parent_id }}>
+      </label>
+      <label>状态
+        <select name="status">
+          {% for s in STATUSES %}
+          <option value="{{ s }}" {{ 'selected' if s == ticket.status }}>
+            {{ {'open':'待处理','in_progress':'处理中','done':'已完成','closed':'已关闭'}[s] }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>优先级
+        <select name="priority">
+          {% for p in PRIORITIES %}
+          <option value="{{ p }}" {{ 'selected' if p == ticket.priority }}>
+            {{ {'low':'低','medium':'中','high':'高'}[p] }}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+    </div>
+    <div class="actions">
+      <button type="submit">保存</button>
+      <span></span>
+    </div>
+  </form>
+  <p class="stamp">
+    创建于 {{ ticket.created_at.strftime('%Y-%m-%d %H:%M') }} ·
+    更新于 {{ ticket.updated_at.strftime('%Y-%m-%d %H:%M') }} · #{{ ticket.id }}
+  </p>
+</div>
+
+<datalist id="group-list">
+  {% for g, n in groups %}<option value="{{ g }}"></option>{% endfor %}
+</datalist>
+
+<form method="post" action="/tickets/{{ ticket.id }}/delete"
+      style="margin-top:1rem"
+      onsubmit="return confirm('确定删除这个工单吗？不可恢复。')">
+  <input type="hidden" name="revision" value="{{ revision }}">
+  <input type="hidden" name="request_id" value="delete-{{ request_id }}">
+  <button type="submit" class="danger">删除工单</button>
+</form>
+{% endblock %}
