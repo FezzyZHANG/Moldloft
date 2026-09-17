@@ -5,10 +5,21 @@ in [MLD-DEC-002](docs/decisions/002-standalone-source-extraction.md).
 
 ## [Unreleased]
 
+## 0.2.0a1 — 2026-09-18
+
+First Drydock test release; no live data has been moved from the original ticket repository.
+
 - Added Drydock catalog and independent graph stores. Default data stays in place; HTTP,
   maintenance and proposal bases carry graph scope, with per-graph recovery and retry IDs.
 - Added MCP Drydock discovery and explicit scope to every graph tool. Results and Copilot
   context identify the owning graph; browser selection cannot retarget an agent's calls.
+- Added creation, rename and switching in the graph and list/detail headers. Switching
+  saves existing drafts first, holds failed saves/IME/uncreated drafts, checks destination
+  availability and resets page-local chat, previews and filters. Forms and SSE keep scope.
+- Verified legacy schema upgrade, same local IDs across graphs, independent mixed review,
+  scoped MCP/Copilot, retry/conflict behavior and responsive browser controls with fixtures.
+- Limits: one local operator, at most 100 Drydocks, no cross-graph links, move/delete,
+  export/restore or automatic paired backups. This alpha is not a live migration.
 
 ## 0.1.0 — 2026-09-18
 

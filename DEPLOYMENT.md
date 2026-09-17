@@ -5,6 +5,13 @@ As of 2026-09-18, this repository is an independent source baseline. It installs
 and runs without the former host. No live workspace has been moved or made authoritative
 here. [MLD-DEC-002](docs/decisions/002-standalone-source-extraction.md) records that choice.
 
+The `0.2.0a1` Drydock test release adds multiple independent graphs in one local service.
+Schema v4 adds a catalog while preserving the default graph's DB and notebook paths.
+Additional graphs have separate stores under the configured roots; see
+[the data layout](README.md#drydock-storage-and-api-scope). Back up the primary catalog
+and every graph's DB/notebook/review together. Evaluate the alpha on disposable state;
+local Drydock IDs do not complete the deployment identity or export/restore gates below.
+
 ## Standalone verification
 
 Use a fresh virtual environment and the [installation instructions](README.md#run).

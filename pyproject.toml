@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "moldloft"
-version = "0.1.0"
+version = "0.2.0a1"
 description = "A local ticket dependency graph and Markdown exploration notebook"
 readme = "README.md"
 requires-python = ">=3.10"
