@@ -46,6 +46,25 @@ The repository and distribution are `Moldloft` / `moldloft`. The Python package 
 
 ## Scope and source of truth
 
+### Drydock graph isolation
+
+**Drydock** is a named independent dependency graph and notebook. The primary SQLite DB
+holds a `drydocks` catalog; schema v4 preserves the original store as `default`. Additional
+IDs are `d-` followed by a UUID hex string. Each owns a separate DB, notebook and review
+folder, so tickets, notes, proposals, revisions, retry IDs and recovery are graph-local.
+Names are versioned metadata and never used as filesystem paths. See
+[MLD-DEC-003](docs/decisions/003-drydock-graph-isolation.md) for the tradeoff and attention cost.
+
+`Drydocks` resolves a stable ID into a `Store`, `Notebook` and `Proposals` context. HTTP
+pins it in request state using `?drydock=<id>`; omission selects `default`. There is no
+global selected graph. Graph snapshots and read bases carry identity; cross-graph bases
+fail before proposal writes. Historical bases without identity apply only to `default`.
+Recovery and translation workers use the owning store, with independent failure state.
+Unknown selections fail with 404; missing additional stores fail with 503, never a blank
+replacement. The primary catalog remains required for all selections.
+
+### Existing single-graph semantics
+
 This is a local development tool, with one operator and potentially several browser tabs or
 API writers. It has no presence/cursor protocol or collaborative text merge. The existing
 FastAPI, SQLAlchemy, SQLite and Jinja stack remains; `/` and ticket detail pages coexist

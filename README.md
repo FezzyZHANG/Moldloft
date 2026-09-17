@@ -76,6 +76,31 @@ unconfigured IDs in old links remain unavailable instead of being rebound automa
 
 ## Editing the graph
 
+### Drydock storage and API scope
+
+Each **Drydock** is an independent dependency graph with its own tickets, notes, proposals
+and revisions. The existing store is `default`; renaming it does not change that ID.
+`GET /api/drydocks` lists `{items, default_id, limit}`. Create with `POST /api/drydocks`
+and `{name, request_id}`; rename with `PATCH /api/drydocks/{id}` and `{name, version}`.
+Names contain 1-80 characters and are unique ignoring case. Reuse the same request ID and
+name after an uncertain create response. This test version allows 100 graphs.
+
+Graph/list/detail pages and every graph API accept `?drydock=<id>`. Omission always means
+`default`. IDs in a graph are local: `#1` in two Drydocks refers to different work. Returned
+graphs and captured read bases include `drydock_id`; cross-graph proposals are rejected.
+No cross-graph edges, shared notes, move or delete operation is provided.
+
+The default DB/notebook stay at their configured paths. Additional DBs live under
+`<DB parent>/drydocks/<id>/tickets.db`, with Markdown in
+`<notes parent>/drydocks/<id>/notes/` and `review/` beside that notebook. These roots can
+differ. Preserve the primary DB catalog along with each graph's DB, notebook and review
+files in your paired backup. Missing graph storage is unavailable, never reset to empty.
+Recovery/cleanup/organization commands accept `--drydock <id>` with the **primary** `--db`
+and `--notes` paths. Organization plans for other graphs must include `drydock_id`.
+See [the isolation decision](docs/decisions/003-drydock-graph-isolation.md).
+
+### Within a Drydock
+
 - Select a ticket in the tree or graph. Selection brings the node into readable view;
   **Fit** shows the entire graph. Use the mouse wheel or +/- to zoom, drag empty canvas to
   pan, or focus the canvas and use arrow keys. Nodes and collapse controls support Enter.

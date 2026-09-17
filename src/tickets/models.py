@@ -71,6 +71,18 @@ class GraphMeta(Base):
     next_ticket_id: Mapped[int] = mapped_column(default=1)
 
 
+class Drydock(Base):
+    """The primary DB owns the catalog; each graph keeps its existing store contract."""
+    __tablename__ = "drydocks"
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)
+    name: Mapped[str] = mapped_column(String(80))
+    name_key: Mapped[str] = mapped_column(String(160), unique=True)
+    version: Mapped[int] = mapped_column(default=1)
+    request_id: Mapped[str | None] = mapped_column(String(80), unique=True, nullable=True)
+    request_hash: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[dt.datetime] = mapped_column(DateTime, default=dt.datetime.utcnow)
+
+
 class MutationReceipt(Base):
     """Only acknowledged mutation metadata; never chat or proposed text."""
     __tablename__ = "mutation_receipts"

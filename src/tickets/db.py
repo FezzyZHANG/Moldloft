@@ -14,7 +14,7 @@ from .models import Base, GraphMeta, Ticket
 from .config import default_db_path
 
 DB_PATH = default_db_path()
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 
 def initialize(path: Path):

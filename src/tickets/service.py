@@ -216,14 +216,16 @@ def ticket_id_map(tickets, next_id):
 
 
 class Store:
-    def __init__(self, engine, git=None, notes=None):
+    def __init__(self, engine, git=None, notes=None, *, drydock_id="default"):
         self.engine, self.git, self.notes = engine, git, notes
+        self.drydock_id = drydock_id
 
     def graph(self):
         with self.engine.connect() as connection:
             connection.exec_driver_sql("BEGIN")
             with Session(connection) as session:
                 graph = snapshot(session)
+        graph["drydock_id"] = self.drydock_id
         return self.notes.decorate(graph) if self.notes else graph
 
     def revision(self):
@@ -248,7 +250,7 @@ class Store:
         after = reduce_graph(before, operations)
         if self.notes:
             after = self.notes.decorate(after, {k: after[k] for k in ("notes", "notes_revision", "notes_errors")})
-        return {"operations": operations, "base_revision": before["revision"],
+        return {"operations": operations, "base_revision": before["revision"], "drydock_id": self.drydock_id,
                 "changes": changes_between(before, after), "preview": after}
 
     def mutate(self, operations, *, revision=None, versions=None, request_id=None, notes_revision=None):

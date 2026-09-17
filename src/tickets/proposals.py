@@ -31,6 +31,7 @@ class Expired(DomainError):
 def graph_at(store, connection):
     with Session(connection) as session:
         graph = snapshot(session)
+    graph['drydock_id'] = store.drydock_id
     return store.notes.decorate(graph) if store.notes else {**graph, 'notes': [], 'notes_revision': '', 'notes_errors': []}
 
 

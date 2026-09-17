@@ -55,7 +55,8 @@ def capture(graph, ticket_ids=(), note_ids=(), complete=True):
     tids, nids = dependencies(graph, ticket_ids, note_ids)
     complete = bool(complete and not graph.get('notes_errors') and len(tids) <= 50 and len(nids) <= 20)
     tids, nids = set(sorted(tids)[:50]), set(sorted(nids)[:20])
-    return {'revision': graph['revision'], 'notes_revision': graph.get('notes_revision'),
+    return {'drydock_id': graph.get('drydock_id', 'default'),
+            'revision': graph['revision'], 'notes_revision': graph.get('notes_revision'),
             'tickets': {str(t['id']): t['version'] for t in graph['tickets'] if t['id'] in tids},
             'notes': {n['id']: n['version'] for n in graph.get('notes', []) if n['id'] in nids},
             'complete': complete, **structure(graph)}
@@ -63,8 +64,10 @@ def capture(graph, ticket_ids=(), note_ids=(), complete=True):
 
 def validate_shape(basis):
     fields = {'revision', 'notes_revision', 'tickets', 'notes', 'complete', 'ticket_structure', 'note_structure'}
-    if not isinstance(basis, dict) or set(basis) != fields:
+    if not isinstance(basis, dict) or set(basis) not in (fields, fields | {'drydock_id'}):
         raise DomainError('Provide the complete read-result basis envelope')
+    if 'drydock_id' in basis and (not isinstance(basis['drydock_id'], str) or not basis['drydock_id'] or len(basis['drydock_id']) > 40):
+        raise DomainError('Invalid Drydock identity')
     if type(basis['revision']) is not int or basis['revision'] < 0 or type(basis['complete']) is not bool:
         raise DomainError('Invalid basis revision/completeness')
     for name in ('notes_revision', 'ticket_structure', 'note_structure'):
@@ -110,6 +113,9 @@ def targets(operations, graph):
 
 def check(basis, graph, operations):
     validate_shape(basis)
+    # Old captured bases remain valid only in the untouched legacy/default graph.
+    if basis.get('drydock_id', 'default') != graph.get('drydock_id', 'default'):
+        raise DomainError('Proposal belongs to another Drydock; read the target graph first', 409)
     if graph.get('notes_errors'):
         raise DomainError('Notebook is incomplete; proposal cannot be validated', 409)
     required_tickets, required_notes = targets(operations, graph)

@@ -5,6 +5,9 @@ in [MLD-DEC-002](docs/decisions/002-standalone-source-extraction.md).
 
 ## [Unreleased]
 
+- Added Drydock catalog and independent graph stores. Default data stays in place; HTTP,
+  maintenance and proposal bases carry graph scope, with per-graph recovery and retry IDs.
+
 ## 0.1.0 — 2026-09-18
 
 - Initialized the independent repository from the ticket/notebook application, preserving

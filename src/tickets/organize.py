@@ -10,6 +10,7 @@ from pathlib import Path
 import sqlite3
 
 from .db import initialize
+from .drydocks import Drydocks, DEFAULT_DRYDOCK
 from .config import absolute_path, data_paths
 from .service import Store, DomainError
 
@@ -20,6 +21,8 @@ def title_digest(graph, ids):
 
 
 def operations_for(graph, plan):
+    if plan.get('drydock_id', DEFAULT_DRYDOCK) != graph.get('drydock_id', DEFAULT_DRYDOCK):
+        raise DomainError('Organization plan belongs to another Drydock')
     by_id = {t['id']: t for t in graph['tickets']}
     assignments = [(i, group) for group, ids in plan['groups'].items() for i in ids]
     ids = {i for i, _ in assignments}
@@ -48,20 +51,25 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--plan', required=True)
     parser.add_argument('--db', type=Path, default=None)
+    parser.add_argument('--notes', type=Path)
+    parser.add_argument('--drydock', default=DEFAULT_DRYDOCK)
     parser.add_argument('--apply', action='store_true')
     args = parser.parse_args()
     path = absolute_path(args.plan, "--plan")
     plan = json.loads(path.read_text(encoding='utf-8'))
-    database, _ = data_paths(args.db)
+    database, notebook = data_paths(args.db, args.notes)
     if not database.is_file():
         raise DomainError('The target database must already exist')
-    engine = initialize(database)
+    catalog = Drydocks(database, notebook)
+    engine = None
     try:
-        store = Store(engine)
+        database, _ = catalog.available_paths(args.drydock)
+        engine = catalog.engine if args.drydock == DEFAULT_DRYDOCK else initialize(database)
+        store = Store(engine, drydock_id=args.drydock)
         before = store.graph()
         operations = operations_for(before, plan)
         preview = store.preview(operations, before) if operations else {'changes': []}
-        print(json.dumps({'mode': 'apply' if args.apply else 'preview', 'groups': plan['groups'],
+        print(json.dumps({'drydock_id': args.drydock, 'mode': 'apply' if args.apply else 'preview', 'groups': plan['groups'],
                           'dependencies': plan['dependencies'], 'changes': len(preview['changes'])}, indent=2))
         if not args.apply or not operations:
             return
@@ -74,7 +82,9 @@ def main():
         result = store.mutate(operations, revision=before['revision'])
         print(json.dumps({'revision': result['revision'], 'backup': str(backup)}))
     finally:
-        engine.dispose()
+        if engine is not None and engine is not catalog.engine:
+            engine.dispose()
+        catalog.close()
 
 
 if __name__ == '__main__':
