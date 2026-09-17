@@ -3,15 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}工单{% endblock %} · Moldloft</title>
+  <title>{% block title %}工单{% endblock %} · {{ drydock.name }} · Moldloft</title>
   <link rel="stylesheet" href="/static/style.css">
+  <script type="module" src="/static/drydocks.js"></script>
 </head>
-<body>
+<body data-drydock-id="{{ drydock.id }}" data-drydock-name="{{ drydock.name }}" data-drydock-version="{{ drydock.version }}">
   <div class="wrap">
     <header class="top">
-      <a class="brand" href="/">Moldloft<span>工单</span></a>
+      <a class="brand" href="{{ scope_url('/') }}" data-drydock-navigation>Moldloft<span>工单</span></a>
       {% if demo %}<span>演示数据</span>{% endif %}
-      <a class="back" href="/graph" style="float:right">依赖图 →</a>
+      <a class="back" href="{{ scope_url('/graph') }}" data-drydock-navigation style="float:right">依赖图 →</a>
+      {% include '_drydock.html' %}
     </header>
     {% block content %}{% endblock %}
   </div>

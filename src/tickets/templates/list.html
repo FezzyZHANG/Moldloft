@@ -5,9 +5,9 @@
 
 {% set qgroup = '&group=' ~ active_group|urlencode if active_group else '' %}
 <div class="filters">
-  <a href="/?{{ qgroup[1:] }}" class="{{ 'on' if not active_status }}">全部</a>
+  <a href="{{ scope_url('/?' ~ qgroup[1:]) }}" class="{{ 'on' if not active_status }}">全部</a>
   {% for s in STATUSES %}
-  <a href="/?status={{ s }}{{ qgroup }}" class="{{ 'on' if active_status == s }}">
+  <a href="{{ scope_url('/?status=' ~ s ~ qgroup) }}" class="{{ 'on' if active_status == s }}">
     {{ {'open':'待处理','in_progress':'处理中','done':'已完成','closed':'已关闭'}[s] }} ({{ counts[s] }})
   </a>
   {% endfor %}
@@ -17,16 +17,16 @@
 {% set qstatus = 'status=' ~ active_status ~ '&' if active_status else '' %}
 <div class="filters groups">
   <span class="flabel">工单组</span>
-  <a href="/?{{ qstatus[:-1] }}" class="{{ 'on' if not active_group }}">不限</a>
+  <a href="{{ scope_url('/?' ~ qstatus[:-1]) }}" class="{{ 'on' if not active_group }}">不限</a>
   {% for g, n in groups %}
-  <a href="/?{{ qstatus }}group={{ g|urlencode }}" class="{{ 'on' if active_group == g }}">{{ g }} ({{ n }})</a>
+  <a href="{{ scope_url('/?' ~ qstatus ~ 'group=' ~ g|urlencode) }}" class="{{ 'on' if active_group == g }}">{{ g }} ({{ n }})</a>
   {% endfor %}
 </div>
 {% endif %}
 
 <div class="new">
   <h2>新建工单</h2>
-  <form class="row" method="post" action="/tickets">
+  <form class="row" method="post" action="{{ scope_url('/tickets') }}">
     <label>标题
       <input type="text" name="title" required maxlength="200">
     </label>
@@ -68,12 +68,12 @@
     <tr>
       <td>{{ t.id }}</td>
       <td>
-        <a href="/tickets/{{ t.id }}">{{ t.title }}</a>
+        <a href="{{ scope_url('/tickets/' ~ t.id) }}">{{ t.title }}</a>
         {% if t.title_zh %}<div class="translation">{{ t.title_zh }}</div>{% endif %}
       </td>
       <td>
         {% if t.group_name %}
-        <a class="grp" href="/?group={{ t.group_name|urlencode }}">{{ t.group_name }}</a>
+        <a class="grp" href="{{ scope_url('/?group=' ~ t.group_name|urlencode) }}">{{ t.group_name }}</a>
         {% endif %}
         {% if t.tech_notes %}<span class="has-notes" title="有技术要点">◆</span>{% endif %}
       </td>

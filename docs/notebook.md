@@ -3,6 +3,11 @@
 This is the file and write contract for the configured notebook. No authored project notes
 are included in the application repository or distribution.
 
+Each [Drydock](../README.md#drydock-storage-and-api-scope) has its own notebook. Note IDs
+and `ticket:` / `note:` relation targets resolve within that graph only; identical IDs in
+another Drydock are unrelated. The following format and write rules apply separately to
+each notebook. Moving or sharing notes across graphs is not supported in the test release.
+
 ## File contract
 
 Each loaded file has a stable `n-...` ID matching its filename:

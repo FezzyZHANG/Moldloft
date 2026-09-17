@@ -10,6 +10,9 @@ application code, documentation and synthetic fixtures; it starts with an empty 
 See [the extraction decision](docs/decisions/002-standalone-source-extraction.md) for source
 commits and boundaries. Existing user data and the original repository remain in place.
 
+The first Drydock test release is **0.2.0a1**. It adds independent named graphs in the UI
+and MCP. Evaluate it with a disposable workspace; it does not migrate the original queue.
+
 Start development with [AGENTS.md](AGENTS.md); implementation contracts live in
 [DESIGN.md](DESIGN.md), [MCP.md](MCP.md) and the [notebook guide](docs/notebook.md).
 [DEPLOYMENT.md](DEPLOYMENT.md) distinguishes this independent source baseline from a future
@@ -77,6 +80,14 @@ unconfigured IDs in old links remain unavailable instead of being rebound automa
 ## Editing the graph
 
 ### Drydock storage and API scope
+
+Use the **Drydock** selector in the header to switch graphs, **+** to create an empty one,
+and **Rename** (重命名) to change its name. Existing ticket/note editors save before a
+switch completes. Failed saves, active IME composition, uncreated drafts or unfinished
+review amendments hold the current page; finish the edit and select the destination again.
+The older list/detail forms still require their explicit Save button. An unavailable
+destination leaves the current page usable. Switching resets chat, previews, selection and
+filters; independent tabs remain in their own graphs. These controls add no recurring duty.
 
 Each **Drydock** is an independent dependency graph with its own tickets, notes, proposals
 and revisions. The existing store is `default`; renaming it does not change that ID.
@@ -269,7 +280,7 @@ The optional organization CLI takes an explicit absolute plan path:
 makes a local recovery snapshot and performs a revision-guarded update. No old plan ships
 or runs automatically. The configured DB must already exist.
 
-Before upgrading a database older than schema v3, startup takes a consistent SQLite backup into
+Before upgrading a database older than schema v4, startup takes a consistent SQLite backup into
 `data/backups/tickets-before-v3-<UTC timestamp>.sqlite3`. A migration error stops startup.
 This is a **local pre-migration recovery point**, not scheduled or off-device backup.
 Neither the DB nor these snapshots survive losing the disk or cloning the repositories.
@@ -366,7 +377,7 @@ durability still comes from tracked Markdown, not the DB's temporary recovery im
 
 ## API and verification
 
-`GET /api/graph` returns `tickets`, execution `edges`, code `links`, and the integer ticket
+`GET /api/graph` returns `drydock_id`, `tickets`, execution `edges`, code `links`, and the integer ticket
 `revision`, plus `notes`, typed `relations`, `notes_revision`, and `notes_errors`. Each
 ticket also exposes derived `assumptions` and `review_notes`; these do not change its
 status or execution readiness. The notebook revision is a content fingerprint separate
@@ -378,20 +389,24 @@ ticket batch. The most useful endpoints are:
 
 | Endpoint | Body / behavior |
 |---|---|
+| `GET /api/drydocks` | Catalog of stable IDs, names, metadata versions and the default ID |
+| `POST /api/drydocks` | `name`, stable `request_id`; create an empty independent graph |
+| `PATCH /api/drydocks/{id}` | `name`, metadata `version`; retry/conflict-aware rename |
 | `POST /api/tickets` | `fields`, `revision`, `request_id` |
 | `PATCH /api/tickets/{id}` | `fields`, `version`, `request_id`; also `revision` for parent/group edits |
 | `POST /api/mutations` | `operations`, `revision`, `request_id`; atomic create/update/delete/edge/link batch |
 | `GET /api/events` | Combined ticket/notebook revision invalidations; reload the full snapshot on reconnect |
 | `PUT /api/notes/{note_id}` | `fields`, content-hash `version`; null version creates one Markdown file |
 | `POST /api/copilot/chat` | `messages`, optional `selected_id`, `selected_note`, `references`; streamed context/text/proposal/error/done events |
-| `POST /api/copilot/apply` | `operations`, `revision`, `context_ids`, `request_id`, `notes_revision`; synchronous Copilot acceptance |
+| `POST /api/copilot/apply` | `drydock_id`, `operations`, `revision`, `context_ids`, `request_id`, `notes_revision`; synchronous Copilot acceptance |
 | `GET /api/proposals` | Pending proposals by default; read-only live check, target IDs, ticket groups and store per item |
 | `GET /api/proposals/{id}` | Stored record, live check, preview graph and rendered difference sections; changes no row |
 | `POST /api/proposals/{id}/apply` | Optional `edits` and `note`; revalidates the original basis, applies tickets/notes with recovery, records amendments |
 | `POST /api/proposals/{id}/reject` | Required `reason`, stored with the outcome and returned by `get_proposal` |
 
-Apply a synchronous Copilot proposal using its `base_revision` as the request's `revision` and its captured
-`notes_revision`. When the graph contains notes, omitting `notes_revision` returns HTTP
+Scope graph endpoints with `?drydock=<id>` (omission means `default`). Apply a synchronous
+Copilot proposal using its `drydock_id`, `base_revision` as the request's `revision`, and
+its captured `notes_revision`. When the graph contains notes, omitting `notes_revision` returns HTTP
 428; a changed notebook fingerprint expires the proposal even if the tickets did not change.
 
 For example, an operation to connect #1 to #2 is
@@ -421,6 +436,11 @@ rerunning the smoke script. Screenshots go to the OS temporary directory.
 Run `node tests/browser.notes.mjs` against the fixture server to exercise note
 saving/IME/conflicts, bilingual abstract lookup, typed links, backlinks, local graph and
 separate note creation. Restart the fixture before each browser script.
+
+`node tests/browser.drydocks.mjs` covers graph creation/rename, lost acknowledgements,
+same-ID isolation, MCP review and Copilot apply in a named graph, independent SSE streams,
+save-before-switch, failed drafts, IME, notes, unavailable destinations, legacy forms and
+responsive controls. Restart the fixture before this script as well.
 
 `node tests/browser.viewport.mjs` checks actual ticket/note SSE updates, selected-node
 anchoring through collapse/filter, typing during the 500/1000 worker layout and a visible
@@ -481,7 +501,7 @@ fixtures do not establish behavior under actual power loss or inspect the live q
 ```text
 python -m build
 python -m venv <absolute-temporary-environment>
-<temporary-python> -m pip install dist/moldloft-0.1.0-py3-none-any.whl httpx
+<temporary-python> -m pip install dist/moldloft-0.2.0a1-py3-none-any.whl httpx
 ```
 
 From an unrelated directory, use that interpreter to run `python -m tickets` against

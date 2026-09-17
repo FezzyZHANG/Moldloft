@@ -1,0 +1,18 @@
+<div class="drydock-controls" aria-label="Drydock 管理">
+  <label for="drydock-select">Drydock</label>
+  <select id="drydock-select" title="{{ drydock.name }}">
+    {% for item in drydocks %}<option value="{{ item.id }}" {{ 'selected' if item.id == drydock.id }}>{{ item.name }}</option>{% endfor %}
+  </select>
+  <button type="button" id="drydock-create" class="ghost" aria-label="新建 Drydock" title="新建独立依赖图">＋</button>
+  <button type="button" id="drydock-rename" class="ghost" aria-label="重命名 Drydock">重命名</button>
+</div>
+<p id="drydock-error" role="alert" hidden></p>
+<dialog id="drydock-dialog" class="drydock-dialog" aria-labelledby="drydock-dialog-title">
+  <form id="drydock-form">
+    <h2 id="drydock-dialog-title">Drydock</h2>
+    <label>名称<input id="drydock-name" type="text" maxlength="80" required autocomplete="off"></label>
+    <p class="muted">每个 Drydock 独立保存工单、笔记和提案。</p>
+    <p id="drydock-form-error" role="alert" hidden></p>
+    <div class="drydock-dialog-actions"><button type="button" class="ghost" id="drydock-cancel">取消</button><button type="submit" id="drydock-submit">保存</button></div>
+  </form>
+</dialog>

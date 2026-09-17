@@ -4,7 +4,6 @@ import json
 import os
 from pathlib import Path
 
-from .db import initialize
 from .drydocks import Drydocks, DEFAULT_DRYDOCK
 from .config import data_paths
 from .notes import Notebook
@@ -30,7 +29,7 @@ def main(arguments):
     engine = None
     try:
         db, notes = catalog.available_paths(args.drydock)
-        engine = catalog.engine if args.drydock == DEFAULT_DRYDOCK else initialize(db)
+        engine = catalog.open_engine(args.drydock)
         if arguments[0] == 'recover':
             result = recover_pending(engine, notes, check_only=args.check)
         else:

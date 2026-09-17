@@ -2,14 +2,15 @@
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>依赖图 · Moldloft 工单</title>
+  <title>依赖图 · {{ drydock.name }} · Moldloft</title>
   <link rel="stylesheet" href="/static/style.css"><link rel="stylesheet" href="/static/graph.css">
   <script src="/static/vendor/elk/elk-api.js" defer></script>
   <script type="module" src="/static/graph.js"></script>
 </head>
-<body class="dag-app" data-translation-enabled="{{ 'true' if translation_enabled else 'false' }}">
-  <header class="dag-top"><a class="brand" href="/">Moldloft<span>工单</span></a>
-    <nav aria-label="视图"><a href="/">列表</a><strong>依赖图</strong></nav>
+<body class="dag-app" data-translation-enabled="{{ 'true' if translation_enabled else 'false' }}" data-drydock-id="{{ drydock.id }}" data-drydock-name="{{ drydock.name }}" data-drydock-version="{{ drydock.version }}">
+  <header class="dag-top"><a class="brand" href="{{ scope_url('/') }}" data-drydock-navigation>Moldloft<span>工单</span></a>
+    <nav aria-label="视图"><a href="{{ scope_url('/') }}" data-drydock-navigation>列表</a><strong>依赖图</strong></nav>
+    {% include '_drydock.html' %}
     {% if demo %}<span class="demo-label">演示数据</span>{% endif %}
     <span id="connection" role="status">连接中</span><button id="proposal-count" class="ghost" hidden>待审提案 0</button><button id="new-ticket">＋ 新建工单</button>
   </header>

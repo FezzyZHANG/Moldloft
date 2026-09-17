@@ -9,7 +9,6 @@ import json
 from pathlib import Path
 import sqlite3
 
-from .db import initialize
 from .drydocks import Drydocks, DEFAULT_DRYDOCK
 from .config import absolute_path, data_paths
 from .service import Store, DomainError
@@ -64,7 +63,7 @@ def main():
     engine = None
     try:
         database, _ = catalog.available_paths(args.drydock)
-        engine = catalog.engine if args.drydock == DEFAULT_DRYDOCK else initialize(database)
+        engine = catalog.open_engine(args.drydock)
         store = Store(engine, drydock_id=args.drydock)
         before = store.graph()
         operations = operations_for(before, plan)

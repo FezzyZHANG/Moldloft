@@ -236,7 +236,7 @@ class ReviewSurfaceTests(unittest.TestCase):
             return result.get('structuredContent') or json.loads(result['content'][0]['text'])
         tools = {t['name'] for t in rpc('tools/list')['tools']}
         self.assertIn('propose_changes', tools)
-        self.assertEqual(len(tools), 9)
+        self.assertEqual(len(tools), 10)
         self.assertFalse({'apply', 'approve', 'reject', 'apply_proposal'} & tools)
         captured = call('get_ticket', {'ticket_id': 1})['basis']
         pending = call('propose_changes', {'operations': [{'op': 'update', 'ticket_id': 1, 'fields': {'title': 'Via MCP'}}],

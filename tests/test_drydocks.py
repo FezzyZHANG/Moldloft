@@ -166,6 +166,11 @@ class DrydockTests(unittest.TestCase):
         broken.write_bytes(b'')
         self.assertEqual(self.client.get('/api/graph', params={'drydock': invalid}).status_code, 503)
         self.assertEqual(broken.read_bytes(), b'')
+        with contextlib.redirect_stdout(io.StringIO()) as output:
+            code = maintenance(['recover', '--check', '--db', str(self.database),
+                                '--notes', str(self.notebook), '--drydock', invalid])
+        self.assertEqual(code, 1, output.getvalue())
+        self.assertEqual(broken.read_bytes(), b'')
 
     def test_scoped_form_redirect_and_recovery_failure_leave_siblings_usable(self):
         dock = self.create()

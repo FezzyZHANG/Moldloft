@@ -12,7 +12,8 @@ Install this repository with `pip install .`, then start the normal application.
 Connect a Streamable HTTP MCP client to `http://127.0.0.1:8787/mcp`. The endpoint uses the
 official MCP Python SDK v1 (`mcp>=1.30,<2`), stateless HTTP and JSON responses, mounted on
 the existing FastAPI app. Its session manager is owned by the host lifespan and recreated
-on restart. Database creation still happens only at application startup.
+on restart. The primary store initializes at startup; creating a Drydock initializes its
+empty store, and first access opens and recovers its context. Module import performs no DB work.
 
 Missing MCP dependencies produce a visible 503 at `/mcp`; ordinary ticket editing remains
 available. Default transport Host/Origin validation permits localhost. If deliberately using
@@ -180,7 +181,7 @@ rules remain the notebook contract; an agent cannot propose adopting a premise.
 
 ## 6. Storage and review
 
-`proposals` lives in the existing local ticket DB (schema v3). It stores normalized operations,
+`proposals` lives in its Drydock's ticket DB (introduced in schema v3, now v4). It stores normalized operations,
 summary, rationale, source/origin, immutable basis, retry hash/ID, status and outcome. It does
 not store conversations, prompts, system prompts or model identity beyond source. The existing
 Copilot path remains page-local; its chats and unapplied proposals are not persisted.

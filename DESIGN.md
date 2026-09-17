@@ -63,6 +63,13 @@ Recovery and translation workers use the owning store, with independent failure 
 Unknown selections fail with 404; missing additional stores fail with 503, never a blank
 replacement. The primary catalog remains required for all selections.
 
+The page's dataset fixes the ID used by its JSON client, SSE and Copilot stream. The
+shared header manages catalog names separately. A switch saves the existing editors,
+checks destination availability and performs full-page navigation; failures retain the
+old page and draft. Composition or uncreated drafts hold the switch until the owner
+finishes them. List/detail form links and redirects preserve scope. Page-local selection,
+chat, filters and previews do not survive a graph change; independent tabs do.
+
 ### Existing single-graph semantics
 
 This is a local development tool, with one operator and potentially several browser tabs or
@@ -278,7 +285,7 @@ of the ticket transaction and remains held through rollback, commit-error inspec
 compensation. Do not mix old and new application versions as writers during upgrade.
 
 Before staging SQL, the transaction declares its note paths and persists exact prior bytes or
-absence in `note_write_attempts` inside the existing ticket DB (schema v3). Each replace checks
+absence in `note_write_attempts` inside the owning ticket DB (introduced in schema v3, now v4). Each replace checks
 the declared baseline and retains its intended bytes in memory. Successful commit deletes the
 attempt in the same SQL transaction as staged work. On an exception, rollback is followed by
 byte-exact compensation while the outer lock still excludes writers. A missing attempt after

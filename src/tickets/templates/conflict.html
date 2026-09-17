@@ -6,5 +6,5 @@
 <p>你的输入保留在下面。请比较当前版本后重新编辑。</p>
 <label>本次输入<textarea rows="16" readonly>{{ submitted|tojson(indent=2) }}</textarea></label>
 {% if current %}<label>服务器版本<textarea rows="16" readonly>{{ current|tojson(indent=2) }}</textarea></label>{% endif %}
-<a class="back" href="/graph?ticket={{ ticket_id }}">在依赖图中打开当前版本 →</a>
+<a class="back" href="{{ scope_url('/graph?ticket=' ~ ticket_id) }}">在依赖图中打开当前版本 →</a>
 {% endblock %}

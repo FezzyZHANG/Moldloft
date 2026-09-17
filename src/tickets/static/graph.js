@@ -3,8 +3,11 @@ import {Diagram, statuses, priorities} from './canvas.js';
 import {groupKey, previewOverlay, ticketKey, noteKey} from './layout.js';
 import {NotesEditor} from './notes-editor.js';
 import {matchesNote, noteKinds, notePreview, noteStates, relationNames} from './notes-data.js';
+import {scopedUrl, setupDrydocks} from './drydocks.js';
 
 const $ = id => document.getElementById(id);
+const drydockId = document.body.dataset.drydockId;
+const scope = path => scopedUrl(path, drydockId);
 const translationEnabled = document.body.dataset.translationEnabled === 'true';
 const labels = {title: '标题', description: '描述', tech_notes: '技术要点', status: '状态', priority: '优先级', group_name: '工单组', parent_id: '父工单'};
 let graph = {revision: 0, tickets: [], edges: [], links: []}, selected = null, isNew = false;
@@ -26,7 +29,7 @@ function report(error) { $('notice').textContent = error.message || String(error
 $('notice').onclick = () => { $('notice').hidden = true; };
 
 async function api(path, options = {}) {
-  const response = await fetch(path, {cache: 'no-store', ...options,
+  const response = await fetch(scope(path), {cache: 'no-store', ...options,
     headers: {'Content-Type': 'application/json', ...options.headers}});
   let data;
   try { data = await response.json(); } catch { throw new Error('服务器响应不完整，请重试'); }
@@ -34,6 +37,7 @@ async function api(path, options = {}) {
     const error = new Error(data.message || (typeof data.detail === 'string' ? data.detail : '请求未通过验证'));
     error.status = response.status; error.data = data; throw error;
   }
+  if (data.drydock_id && data.drydock_id !== drydockId) throw new Error('响应属于其他 Drydock，请重新载入当前图');
   return data;
 }
 const post = (path, data) => api(path, {method: 'POST', body: JSON.stringify(data)});
@@ -81,11 +85,14 @@ function draw() {
   diagram.render(displayed, collapsed, {group: groupFilter, status: $('status-filter').value, search: $('search').value.trim(),
     focus: localGraph ? focus : null, depth: Number($('local-depth').value), types: visibleRelations, showNotes: $('show-notes').checked}).catch(report);
 }
-const proposalStale = () => proposal && (proposal.base_revision !== graph.revision || proposal.notes_revision !== graph.notes_revision);
+const proposalStale = () => proposal && (proposal.drydock_id !== drydockId || proposal.base_revision !== graph.revision || proposal.notes_revision !== graph.notes_revision);
 
-async function runAction(action) {
-  if (inAction) return;
-  if (creating) { report(new Error('正在创建工单，请等待服务器确认')); return; }
+async function runAction(action, propagate = false) {
+  if (inAction) { if (propagate) throw new Error('正在保存，请等待确认'); return; }
+  if (creating) {
+    const error = new Error('正在创建工单，请等待服务器确认');
+    if (propagate) throw error; report(error); return;
+  }
   inAction = true;
   try {
     if (isNew && draft.dirty) throw new Error('新工单尚未创建，请先创建或取消');
@@ -93,7 +100,7 @@ async function runAction(action) {
     await attention.beforeAction(() => {});
     inAction = false;
     return await action();
-  } catch (error) { report(error); }
+  } catch (error) { if (propagate) throw error; report(error); }
   finally { inAction = false; }
 }
 
@@ -648,9 +655,10 @@ $('chat-form').onsubmit = async event => {
     $('chat-input').value = ''; $('stop-chat').hidden = false; $('send-chat').disabled = true; $('chat-state').textContent = '生成中…';
     let nextProposal = null, text = '';
     try {
-      const response = await fetch('/api/copilot/chat', {method: 'POST', headers: {'Content-Type': 'application/json'},
+      const response = await fetch(scope('/api/copilot/chat'), {method: 'POST', headers: {'Content-Type': 'application/json'},
         body: JSON.stringify({messages, selected_id: selection, selected_note: selectedNote, references: refs}), signal: controller.signal});
       await consumeChat(response, event => {
+        if (event.drydock_id && event.drydock_id !== drydockId) throw new Error('Copilot 响应属于其他 Drydock');
         if (event.type === 'text') { text += event.text; output.textContent = text; }
         if (event.type === 'context') $('chat-context').replaceChildren(...event.ticket_ids.map(id => node('span', '#' + id)),
           ...(event.note_ids || []).map(id => node('span', '◇ ' + (graph.notes.find(n => n.id === id)?.title.slice(0, 24) || id))));
@@ -694,18 +702,25 @@ $('apply-proposal').onclick = () => runAction(async () => {
   applying = true; $('apply-proposal').disabled = true;
   try {
     await post('/api/copilot/apply', {operations: proposal.operations, revision: proposal.base_revision,
-      context_ids: proposal.context_ids, request_id: proposalRequest, notes_revision: proposal.notes_revision});
+      drydock_id: proposal.drydock_id, context_ids: proposal.context_ids, request_id: proposalRequest, notes_revision: proposal.notes_revision});
     history.push({role: 'user', content: 'I applied the complete preview successfully.'});
     message('assistant', '整批修改已保存。'); proposal = null; previewBase = null;
     await refresh(); renderProposal(); draw();
   } finally { applying = false; if (proposal) renderProposal(); }
 });
 
-const stream = new EventSource('/api/events');
+const stream = new EventSource(scope('/api/events'));
 stream.addEventListener('revision', () => refresh().catch(report));
 stream.onopen = () => { $('connection').textContent = '实时同步'; $('connection').className = 'online'; refresh().catch(report); };
 stream.onerror = () => { $('connection').textContent = '重连中 · 草稿保留'; $('connection').className = ''; };
 setInterval(() => { if (stream.readyState !== EventSource.OPEN && document.visibilityState === 'visible') refresh().catch(() => {}); }, 5000);
+setupDrydocks({report, act: action => runAction(async () => {
+  if (applying || reviewing) throw new Error('正在应用提案，请等待确认后再切换 Drydock');
+  if (review?.proposal.status === 'pending' && (collectEdits().length || $('review-note').value.trim())) {
+    throw new Error('审阅修改尚未提交，请先完成审阅或关闭提案。');
+  }
+  return action();
+}, true), beforeNavigate: () => { chatEpoch++; chatController?.abort(); stream.close(); }});
 await refresh();
 const initial = Number(new URL(location.href).searchParams.get('ticket'));
 const initialNote = new URL(location.href).searchParams.get('note');

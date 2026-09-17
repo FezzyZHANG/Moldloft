@@ -1,13 +1,13 @@
 {% extends "base.html" %}
 {% block title %}#{{ ticket.id }} {{ ticket.title }}{% endblock %}
 {% block content %}
-<a class="back" href="/">&larr; 返回列表</a>
+<a class="back" href="{{ scope_url('/') }}">&larr; 返回列表</a>
 {% if ticket.group_name %}
-<a class="back grp" href="/?group={{ ticket.group_name|urlencode }}"
+<a class="back grp" href="{{ scope_url('/?group=' ~ ticket.group_name|urlencode) }}"
    style="margin-left:.8rem">{{ ticket.group_name }}</a>
 {% endif %}
 <div class="detail">
-  <form method="post" action="/tickets/{{ ticket.id }}">
+  <form method="post" action="{{ scope_url('/tickets/' ~ ticket.id) }}">
     <input type="hidden" name="version" value="{{ ticket.version }}">
     <input type="hidden" name="revision" value="{{ revision }}">
     <input type="hidden" name="request_id" value="{{ request_id }}">
@@ -62,7 +62,7 @@
   {% for g, n in groups %}<option value="{{ g }}"></option>{% endfor %}
 </datalist>
 
-<form method="post" action="/tickets/{{ ticket.id }}/delete"
+<form method="post" action="{{ scope_url('/tickets/' ~ ticket.id ~ '/delete') }}"
       style="margin-top:1rem"
       onsubmit="return confirm('确定删除这个工单吗？不可恢复。')">
   <input type="hidden" name="revision" value="{{ revision }}">

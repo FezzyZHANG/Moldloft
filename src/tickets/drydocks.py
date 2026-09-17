@@ -142,19 +142,31 @@ class Drydocks:
                 session.flush()
                 return public(row)
 
+    def open_engine(self, drydock_id):
+        """Open without running recovery; maintenance check mode must remain a check.
+
+        The caller owns disposal of an additional engine. Default uses the catalog engine.
+        """
+        database, _ = self.available_paths(drydock_id)
+        if drydock_id == DEFAULT_DRYDOCK:
+            return self.engine
+        try:
+            with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True)) as source:
+                tables = {row[0] for row in source.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+                required = {'tickets', 'ticket_edges', 'code_links', 'graph_meta', 'mutation_receipts',
+                            'note_write_attempts', 'proposals', 'proposal_receipts'}
+                if not required <= tables or source.execute('SELECT id FROM graph_meta WHERE id=1').fetchone() is None:
+                    raise DomainError('Drydock database is incomplete; preserve it for recovery', 503)
+            return initialize(database)
+        except (OSError, sqlite3.DatabaseError, SQLAlchemyError, RuntimeError) as error:
+            raise DomainError('Drydock database is unavailable; preserve it for recovery', 503) from error
+
     def get(self, drydock_id=DEFAULT_DRYDOCK):
-        database, notebook = self.available_paths(drydock_id)
+        _, notebook = self.available_paths(drydock_id)
         # A missing existing store is unknown/unavailable, never a newly empty graph.
         with self._lock:
             if drydock_id not in self._contexts:
-                try:
-                    if drydock_id != DEFAULT_DRYDOCK:
-                        with closing(sqlite3.connect(database.as_uri() + '?mode=ro', uri=True)) as source:
-                            if source.execute('SELECT id FROM graph_meta WHERE id=1').fetchone() is None:
-                                raise DomainError('Drydock database is incomplete', 503)
-                    engine = self.engine if drydock_id == DEFAULT_DRYDOCK else initialize(database)
-                except (OSError, sqlite3.DatabaseError, SQLAlchemyError, RuntimeError) as error:
-                    raise DomainError('Drydock database is unavailable; preserve it for recovery', 503) from error
+                engine = self.open_engine(drydock_id)
                 book = Notebook(notebook, engine)
                 store = Store(engine, self.git, book, drydock_id=drydock_id)
                 context = DockContext(drydock_id, store, book, Proposals(store))

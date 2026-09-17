@@ -5,6 +5,19 @@
   --fl:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
   --fm:Consolas,ui-monospace,monospace;
 }
+.drydock-controls{display:flex;align-items:center;gap:7px;min-width:0}
+.drydock-controls label{font-size:.8rem;color:var(--brass2);margin:0;flex:none}
+.drydock-controls select{width:18ch;min-width:7ch;max-width:24ch;overflow:hidden;text-overflow:ellipsis}
+.drydock-controls button{font-size:.78rem;padding:4px 8px;white-space:nowrap;flex:none}
+.top .drydock-controls{margin-top:12px}
+#drydock-error,#drydock-form-error{color:var(--rust);font-size:.85rem;overflow-wrap:anywhere}
+.drydock-dialog{color:var(--ink);background:var(--panel);border:1px solid var(--brass);padding:22px;width:420px;max-width:calc(100vw - 24px)}
+.drydock-dialog::backdrop{background:#0007}
+.drydock-dialog form{display:flex;flex-direction:column;gap:12px}
+.drydock-dialog h2{font-size:1rem;margin:0}.drydock-dialog p{margin:0;font-size:.85rem}
+.drydock-dialog-actions{display:flex;justify-content:flex-end;gap:10px}
+.drydock-controls button:focus-visible,.drydock-controls select:focus-visible{outline:2px solid var(--brass2);outline-offset:2px}
+@media(max-width:600px){.drydock-controls select{flex:1;width:0;max-width:none}.drydock-controls{width:100%}}
 @media (prefers-color-scheme:dark){:root{
   --ground:#0D1416;--panel:#121C1E;--panel2:#182427;--rule:#26383A;--rule2:#1C2A2C;
   --ink:#DCE0D7;--ink2:#97A6A1;--dim:#6B7A76;--brass:#C4914A;--brass2:#E0AE63;
