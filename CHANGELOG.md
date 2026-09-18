@@ -5,6 +5,9 @@ in [MLD-DEC-002](docs/decisions/002-standalone-source-extraction.md).
 
 ## [Unreleased]
 
+- Expanded Git ignore rules for SQLite sidecars, local environments, test outputs and
+  system metadata while preserving example configuration and authored Markdown.
+
 ## 0.2.0a1 — 2026-09-18
 
 First Drydock test release; no live data has been moved from the original ticket repository.

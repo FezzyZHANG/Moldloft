@@ -1,24 +1,63 @@
 # Private working state; source clones do not restore a workspace.
 /data/
 /workspace/
-/.env
-/.env.*
-!/.env.example
+.env
+.env.*
+!.env.example
 /config/repositories.json
+*.pem
+*.key
+
+# SQLite working databases, recovery snapshots and transaction sidecars.
 *.db
 *.db-wal
 *.db-shm
+*.db-journal
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.sqlite-journal
 *.sqlite3
-*.pem
-*.key
-# Reproducible installation, build and test outputs.
+*.sqlite3-wal
+*.sqlite3-shm
+*.sqlite3-journal
+
+# Reproducible Python environments, packages and bytecode.
 .venv/
+.venv-*/
+venv/
 dist/
 build/
 *.egg-info/
 __pycache__/
-*.pyc
-node_modules/
+*.py[cod]
+
+# Disposable verification output and tool caches.
 .verification/
-notes/.note-*.tmp
-review/.note-*.tmp
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+playwright-report/
+test-results/
+
+# Browser test dependencies and package-manager diagnostics.
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Atomic replacement scratch files; authored notes and reviews remain trackable.
+**/notes/.note-*.tmp
+**/review/.note-*.tmp
+
+# Operating-system directory metadata.
+.DS_Store
+Thumbs.db
+Desktop.ini
