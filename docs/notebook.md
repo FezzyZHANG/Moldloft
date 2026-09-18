@@ -32,8 +32,10 @@ The Chinese abstract is a compact paragraph with useful English terms retained; 
 abstract gives the same central idea, uncertainty and condition for further exploration.
 Aim for roughly 80-160 Chinese characters and 30-60 English words, shorter where possible.
 Do not translate every sentence or add claims to fill a template. Keep the body in English.
-These owner-requested Chinese content fields are a deliberate exception to English-only
-development prose; documentation, identifiers and the detailed body stay English.
+These fields are the current notebook format; they do not set the language of developer
+conversations. Maintained documentation, identifiers and the detailed body stay English.
+Preserve field names and existing text until an explicit language/schema change provides
+compatibility for stored notes.
 
 Both fields are single-line, JSON-quoted UTF-8 strings in frontmatter, limited to 600 and
 1,200 characters respectively. Soft wrapping in an editor is fine; embedded line breaks are

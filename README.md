@@ -13,10 +13,32 @@ commits and boundaries. Existing user data and the original repository remain in
 The first Drydock test release is **0.2.0a1**. It adds independent named graphs in the UI
 and MCP. Evaluate it with a disposable workspace; it does not migrate the original queue.
 
-Start development with [AGENTS.md](AGENTS.md); implementation contracts live in
-[DESIGN.md](DESIGN.md), [MCP.md](MCP.md) and the [notebook guide](docs/notebook.md).
+Start development with [AGENTS.md](AGENTS.md), then follow the
+[task map](DESIGN.md#navigation) for the affected code, contracts and tests. The
+[record guide](docs/README.md) explains decisions and documentation closeout;
+[CLAUDE.md](CLAUDE.md) is a short pointer to the same contract. Development guidance is
+local to this repository and follows the current user's communication preferences.
 [DEPLOYMENT.md](DEPLOYMENT.md) distinguishes this independent source baseline from a future
 live-workspace migration. There is no authentication or multi-user deployment support.
+
+## Developer bootstrap
+
+For a new development checkout, use an existing Python 3.10+ interpreter from its root:
+
+```text
+python -B tools/agent_hooks/bootstrap.py --install
+```
+
+This verifies the offline sanity lifecycle and merges local Codex, Claude Code and ZCode
+hook settings. Use `--host codex` (or `claude` / `zcode`, repeatable) to select hosts.
+It needs no app dependencies or model key. `--check` inspects setup without writing;
+`--self-test` runs the generated commands against temporary fixtures. Re-run installation
+after moving the checkout or changing its interpreter. Existing unrelated hooks are preserved.
+
+Complete the host's normal trust/review step, then start or resume a development session;
+Codex uses `/hooks`. Setup never grants trust or claims live activation. See
+[agent-hook operations](docs/agent-hooks.md) for the protocol, audit and exact verification
+boundaries. This is developer tooling; running the Moldloft application does not require it.
 
 ## Run
 
@@ -280,8 +302,8 @@ The optional organization CLI takes an explicit absolute plan path:
 makes a local recovery snapshot and performs a revision-guarded update. No old plan ships
 or runs automatically. The configured DB must already exist.
 
-Before upgrading a database older than schema v4, startup takes a consistent SQLite backup into
-`data/backups/tickets-before-v3-<UTC timestamp>.sqlite3`. A migration error stops startup.
+Before upgrading a database older than schema v4, startup takes a consistent SQLite backup
+beside that DB at `backups/<DB stem>-before-v4-<UTC timestamp>.sqlite3`. A migration error stops startup.
 This is a **local pre-migration recovery point**, not scheduled or off-device backup.
 Neither the DB nor these snapshots survive losing the disk or cloning the repositories.
 
@@ -415,11 +437,24 @@ For example, an operation to connect #1 to #2 is
 API; direct SQL bypasses validation and revision invalidations. Read FastAPI's `/docs` for
 request envelopes and [DESIGN.md](DESIGN.md) for the data/concurrency contracts.
 
+Use the chosen virtual environment from [Run](#run), from this repository root.
+Development setup installs dependencies and may use the network:
+
 ```text
 python -m pip install -e ".[dev]"
+```
+
+After setup, these checks use isolated state and fake models:
+
+```text
 python -B -m unittest discover -s tests -v
 node --test tests/draft.test.mjs tests/layout.test.mjs
 ```
+
+Select focused checks using the [task map](DESIGN.md#navigation) and
+[command safety](AGENTS.md#command-safety). Do not start the real workspace merely to
+verify a source change. Maintenance previews and `recover --check` can initialize or
+migrate the catalog even when they do not apply the requested cleanup or file recovery.
 
 Python tests use temporary databases/Git repositories and mock model responses. Node is a
 **development-only** dependency for JS tests. The layout test includes 500 tickets and

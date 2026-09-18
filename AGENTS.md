@@ -1,102 +1,272 @@
 # Moldloft development contract
 
+## Mission
+
 Moldloft is a local ticket dependency graph and exploration notebook. Make work, premises
-and uncertainty legible while preserving the operator's attention. This contract travels
-with the repository. [DEPLOYMENT.md](DEPLOYMENT.md) separates the standalone source baseline from future live-data migration.
+and uncertainty legible while preserving the operator's attention. Optimize for truthful
+state, useful human judgement, low maintenance and readable records that outlast the app;
+engagement, feature count and visible busyness are not success criteria.
+
+This is the authoritative development contract. It is complete within this repository;
+tool-specific entry files point here. Shared principles travel across repositories, while
+mechanisms fit the project. [MLD-DEC-004](docs/decisions/004-self-contained-development-contract.md)
+records the guidance audit and the boundary between development language and stored content.
 
 ## Principles
 
-- Share design logic across repositories: truthful state, human judgement, durable sources,
-  low maintenance and preserved attention. Record justified exceptions before implementation.
-- Reading, choosing, confirming, switching context and maintenance cost attention. Extra
-  screens or recurring duties need a concrete benefit. Automate repetitive logistics while
-  preserving meaningful review. Do not add points, streaks or compliance rewards.
-- Missing input is unknown. A model response, accepted premise or linked note does not
-  prove completed work. Only an explicitly `done` ticket releases its dependents.
-- Keep authored text useful without the app. Layout, readiness and translations are derived.
-- Raw personal data stays local. Model context is bounded, deliberately authored attached
-  text; never silently add contacts, sensors, history, code, diffs or credentials.
-- Copilot proposes ticket edits; MCP submits reviewed ticket/note proposals. Neither gains
-  an approval tool. Keep the original read basis and show amendments. Do not persist
-  conversations or unapplied page-local drafts.
+Changes that depart from these principles need a reasoned local decision before implementation.
+
+- **Budget attention.** Reading, choosing, confirming, switching context and maintenance
+  cost attention. Extra screens or recurring duties need a concrete benefit. Automate
+  repetitive logistics while preserving meaningful review. No points, streaks, compliance
+  rewards or proxy rankings of the operator's activity.
+- **Represent evidence honestly.** Missing input is unknown, not zero, false or success.
+  Intent, a model response, an accepted premise and completed work are distinct. Only an
+  explicitly `done` ticket releases its dependents. Keep exploration separate from execution.
+- **Keep a readable foundation.** Plain text and Git preserve authored rules and reasoning.
+  Layout, readiness and translations are derived. Keep data authorities explicit and
+  document the recovery limits of stores Git cannot restore.
+- **Preserve human judgement.** Copilot proposes ticket edits; MCP submits reviewed
+  ticket/note proposals. Neither gains an approval tool. Retain the original read basis,
+  show amendments, and leave interrupted model responses incomplete.
+- **Protect privacy.** Read only task-relevant material. Model context is bounded,
+  deliberately authored attached text; never silently add contacts, sensors, raw history,
+  code, diffs or credentials. Do not persist conversations or unapplied page-local drafts.
+- **Degrade visibly.** Missing models, Git roots or graph storage must stay visibly
+  unavailable. Keep ordinary editing usable when optional integrations fail. Product
+  messages describe state without nagging, praise for compliance or invented certainty.
+- **Carry principles, not host assumptions.** Components and repositories retain these
+  constraints with suitable mechanisms. No parent checkout, private content, fixed daily
+  quota, theme, operator title or conversation language is required to develop Moldloft.
+
+## Working with the user
+
+- Follow the current user's language and explicit communication preferences. Do not assume
+  a nickname or form of address. Write maintained documentation, design reasoning, code
+  comments, identifiers and commit-ready text in English.
+- Preserve the current UI text, stored field names and bilingual notebook format when
+  unrelated to the task. These compatibility contracts do not dictate conversation language.
+  Configurable application language remains [planned work](DEPLOYMENT.md#remaining-migration-gates).
+- Ask only where the answer changes the work: identify the different actions first. Decide
+  routine naming, formatting and equivalent approaches; state a material assumption and
+  continue. Carry existing authorization forward, including authorized fixes and checks.
+- Ask about genuine scope changes or unapproved consequential side effects. Prepare the
+  concrete result before requesting an approval that is still needed; do not add repeated
+  confirmations to work already authorized. Respect the product's explicit proposal review.
+- Finish authorized work before ending the turn. Report the result, checks actually run
+  and material limits. Stop when complete or blocked on input only the user can supply;
+  completed work needs no trailing offer or promise to perform unfinished work later.
 
 ## Before edits
 
-Read [README.md](README.md) and the affected [DESIGN.md](DESIGN.md) section. For notes,
-read [their contract](docs/notebook.md#file-contract) and only the directly relevant notes,
-states and ticket dependencies. For proposals/recovery, follow
-[MCP.md](MCP.md#7-ordered-apply-and-recovery) and the
-[local decision](docs/decisions/001-mixed-proposal-recovery.md).
-Inspect `git status` and the focused diff; preserve unrelated changes. Keep this repository's
-Git history separate from any host checkout; do not commit it into the host repository.
+1. Read [README.md](README.md) for setup and current capabilities; do not reread it within
+   the same task without a reason. Use the [task map](DESIGN.md#navigation) to read the
+   relevant design section and locate its implementation and fixtures.
+2. Inspect `git status --short` and the focused diff. A dirty worktree is normal; preserve
+   unrelated edits. Keep this repository's commits separate from other checkouts.
+3. For notebook work, read [the file contract](docs/notebook.md#file-contract) and only
+   directly relevant notes, their dates/states and dependencies. For proposal/recovery work,
+   read [the protocol](MCP.md#7-ordered-apply-and-recovery).
+4. Read [the record guide](docs/README.md#when-to-write-a-record) before adding durable
+   reasoning. Links are task routes, not a checklist to load every file into context.
 
-Communicate with the repository owner in Chinese and address them as Boss unless asked otherwise.
-Use English for documentation, identifiers, comments and commit-ready text. Preserve the
-intentional Chinese UI/abstract fields. Ask only when the answer changes the action taken;
-decide routine naming and formatting without spending another confirmation.
+Do not sweep working databases, notebooks, review records, private configuration or other
+repositories to gather background. A source-development task does not authorize live-data
+edits. Inspect command effects under [command safety](#command-safety) before running checks.
+
+## Startup sanity and self-bootstrap
+
+At the first development task in a session, if no `<moldloft-sanity>` block was supplied,
+use the chosen Python 3.10+ interpreter to run
+`python -B tools/agent_hooks/bootstrap.py --check --host <codex|claude|zcode>` once.
+For missing/stale local wiring, run the same command with `--install`; this is ordinary
+repository-local development setup, includes isolated verification, and needs no application
+dependencies. Preserve explicitly disabled or malformed existing settings and report the
+diagnostic instead of resetting them. [Bootstrap operations](docs/agent-hooks.md#bootstrap)
+explain host selection, relocation and trust; do not repeat setup on every turn.
+
+When the host supplies a `<moldloft-sanity>` challenge:
+
+1. Answer it from this contract while continuing the user's task. Acknowledge submission
+   once in the user's language, or acknowledge resubmission on a hook-requested retry.
+   Do not claim a pass: only the stop hook verifies the receipt.
+2. Put exactly one `<!-- moldloft-sanity:<id>:<answer> -->` comment at the end of the final
+   assistant message, using the supplied ID and one requested answer token. Keep the
+   answer/receipt out of visible prose.
+3. Never inspect a real pending expected answer or use synthetic verification as a receipt
+   for the current session. Tests may inspect only their own disposable fixture state.
+4. Repair one hook-requested failure; a second failure produces a warning and allows the
+   turn to finish. Infrastructure failure also degrades visibly without blocking work.
+
+The hook reads this contract and its own temporary state only, without application data,
+transcripts, network or an additional model call. It tests instruction uptake, not security
+or complete understanding. A successful bootstrap proves local configuration and synthetic
+execution, not host activation. Respect the host's review/trust step; never self-grant
+trust or use a trust-bypass flag. Until a real lifecycle fires, report activation as unverified.
+
+## Repository and data map
+
+| Path or store | Authority and editing rule |
+|---|---|
+| `README.md`, `AGENTS.md`, `CLAUDE.md` | Operation, development contract, and a short tool entry pointer; keep one policy authority. |
+| `DESIGN.md`, `MCP.md`, `DEPLOYMENT.md` | Implemented architecture/protocol and explicitly marked future deployment gates. |
+| `src/tickets/` | Runtime Python modules, templates and browser sources; edit producers, not rendered views. |
+| `tests/` | Synthetic Python, JS and browser fixtures; never populate them from a live workspace. |
+| `tools/agent_hooks/` | Standard-library development hooks, short-lived audit and local bootstrap; independent of the application package. |
+| `docs/` | Notebook contract, durable decisions and record conventions. |
+| `pyproject.toml`, `MANIFEST.in` | Dependency and distribution authorities; retain the `tickets` package and `TICKETS_*` compatibility names. |
+| `.env.example`, `config/*.example.json` | Tracked placeholders only; private configuration is outside the source snapshot. |
+| Configured SQLite stores | Ticket and proposal authority, including the primary Drydock catalog; not reproducible from source. |
+| Configured `notes/` and `review/` | User workspace files, outside the installed package; their Git/backup is the operator's responsibility. |
 
 ## Sources and writes
 
 - SQLite owns tickets, containment, dependencies, code links and proposal records. Live
   ticket edits go through the versioned API, never direct SQL. Preserve revisions and retry
   IDs. `A -> B` means B depends on A; containment is a separate DAG.
-- Tracked `notes/*.md` owns exploration text and typed relations. Use file-hash versions and
-  atomic single-file replacement, or deliberate Markdown edits. `assumes`, `supports`,
-  `relates` and `option` never create execution blockers or adopt a premise.
+- Drydock identity scopes tickets, notes, revisions, proposals, retry IDs and recovery.
+  Carry the stable `drydock_id` across requests and read bases. Omission means `default`,
+  never whichever graph another tab selected. Equal local IDs do not join different graphs;
+  unavailable storage must not be replaced by an empty graph.
+- Each configured notebook owns its Markdown text and typed relations. Use file-hash
+  versions and atomic single-file replacement, or deliberate Markdown edits. `assumes`,
+  `supports`, `relates` and `option` never create execution blockers or adopt a premise.
 - Save on leaving the whole editor, finish IME composition first, and show saved only after
-  acknowledgement. Retain failed drafts and visible conflicts.
+  acknowledgement. Retain failed drafts and visible conflicts. Layout strategies remain
+  replaceable; preserve selection context without storing manual coordinates.
 - All app writers use the shared guard. Mixed apply uses ordered SQL/file writes with
   durable recovery, not atomic cross-store reading. Keep exact prior/intended bytes and
   assigned IDs in the existing DB until the SQL outcome commits.
-- Unresolved recovery blocks writes. Preserve external edits and evidence; never clear a
-  marker to unblock a queue. Recover at the recorded notebook path before relocation.
-- `review/*.md` is the tracked human review form; SQLite owns its outcome. The app does not
-  commit files. Cleanup remains explicit and retains retry receipts.
-- The ignored DB currently has only local pre-upgrade snapshots, not scheduled/off-device
-  backup. They do not cover the notebook. Do not introduce another ignored store of authored
-  data or claim cloning restores the queue. Export/restore remains a deployment gate.
-- Keep model providers behind an adapter and Git roots allowlisted with read-only access,
-  secret/path exclusions and bounded output. Do not add new parent-directory imports.
+- Unresolved recovery blocks that graph's writes. Preserve external edits and evidence;
+  never clear a marker to unblock a queue. Recover at the recorded notebook path before
+  relocation. A source copy or passing fixture does not perform a live-data cutover.
+- `review/*.md` is a retained human review form rendered from SQLite, which owns its
+  outcome. Do not hand-edit it to accept a proposal. The app does not commit files; cleanup
+  stays explicit and retains retry receipts. For structural revisions, use the
+  [existing conversation route](README.md#when-a-proposal-needs-revision).
 
-## Verification and command safety
+## Durability, privacy and generated files
 
-Use temporary DBs/notebooks/Git fixtures, disabled translation and fake models. Never use
-the live queue as a fixture. The demo disables translation but sending Copilot chat can
-still make a paid call. Do not run mutating, network-backed, paid-model or outside-repository
-commands merely as smoke tests. A real model call needs evidence a fixture cannot provide,
-an authorized data boundary, and a statement of what it will settle. Never print secrets.
+Before adding or ignoring a file, ask whether tracked sources and a documented command
+can reproduce it. Preserve authored source and original evidence; ignore reproducible
+environments, caches, builds and verification output. A second model call does not restore
+the original text. Privacy and licensing can limit what belongs in Git.
 
-[README commands](README.md#api-and-verification) run from this repository root after installation. For mixed recovery run
-`python -B -m unittest tests.test_proposal_apply tests.test_writes -v`.
-New mixed-apply workers run in temporary directories and discover the imported package;
-keep that working after packaging. Subprocess fixtures run outside the source checkout against the installed package.
+Keep the existing exceptions explicit:
 
-Use `server.py` for fixture launchers so SSE shutdown stays bounded. Start Windows helpers
-hidden and stop only owned processes. Never run recovery against live state as a test.
-Exercise affected Python/JS checks and inspect UI changes with the disposable browser fixture.
-Run `git diff --check`, inspect the final diff/status and report verification limits.
+- **Working SQLite and recovery images:** ignored private authority, with local pre-upgrade
+  snapshots only. Those snapshots are not scheduled/off-device backup and do not cover the
+  notebooks. Pair the primary catalog and every graph's DB, notebook and review files for
+  recovery; [export/restore remains a deployment gate](DEPLOYMENT.md#remaining-migration-gates).
+- **User-authored workspace files:** belong in the operator's workspace Git/paired backups,
+  not in the application source snapshot. Cloning Moldloft does not restore them.
+- **Secrets and private configuration:** never print, commit or copy into diagnostics.
+  Keep example settings synchronized with `config.py` and the model adapter. No automatic
+  backup is promised; security is not a reason to describe them as regenerable.
+- **Agent hook state:** pending checks and metadata-only audit are disposable, local,
+  isolated by checkout/host/session/agent, and pruned on access after two hours. Generated
+  host wiring is ignored and rebuilt by bootstrap; unrelated merged settings remain private
+  operator configuration. [MLD-DEC-005](docs/decisions/005-portable-sanity-bootstrap.md)
+  records these storage and recovery limits.
+- **Review forms:** retain them in workspace Git even though SQLite renders them; they
+  provide a readable review record. **Pinned ELK distributions:** retain exact upstream
+  bytes, licenses, sources, hashes and [reproduction instructions](src/tickets/static/vendor/elk/README.md).
+
+Any new ignored authoritative store or tracked derivation needs a local decision naming
+its purpose, recovery protection and limits. Never normalize original evidence or private
+working records as part of an unrelated source change.
+
+## Runtime and change policy
+
+- Python 3.10+ and the dependencies in `pyproject.toml` are the current baseline. Prefer
+  existing dependencies or the standard library; a new runtime dependency needs a concrete
+  benefit, a failure strategy and updated setup instructions. Node is development-only.
+- Keep runtime code/assets under `src/tickets/`. Use `Path(__file__)` for packaged
+  resources, never the caller's directory. External data/configuration paths are absolute
+  and resolved by `config.py`; never discover a parent checkout or its secrets implicitly.
+- Read/write UTF-8 explicitly. Follow `.gitattributes` for LF and vendored-byte exceptions;
+  account for Windows console encoding and IME input.
+- Keep model access behind `src/tickets/llm.py`, with provider settings in configuration.
+  Models default off. Git roots remain explicitly allowlisted, read-only, bounded and
+  subject to secret/path exclusions.
+- Make the smallest coherent change at the source of truth. Preserve stable IDs, retry
+  behavior, deterministic layout and existing records. Schema, protocol or packaging
+  changes need compatibility or an explicit migration plan, with fixtures at that boundary.
+- Do not add a license for project-authored code without the owner's decision. Preserve
+  vendored notices. Do not mix behavior changes with unrelated formatting or data cleanup.
+
+## Command safety
+
+Run documented development commands from this repository root using its chosen environment.
+Setup/install/build steps have their own effects; they are not read-only checks. See
+[setup and verification](README.md#api-and-verification) for prerequisites.
+
+Read-only source checks include `git status --short`, focused `git diff`, `git diff --check`
+and documentation/source inspection. After development installation, these use disposable
+state and fake models:
+
+```text
+python -B -m unittest discover -s tests -v
+node --test tests/draft.test.mjs tests/layout.test.mjs
+python -B -m unittest tests.test_startup_sanity tests.test_sanity_audit tests.test_agent_bootstrap -v
+```
+
+- Hook `bootstrap.py --check` only reads configuration/anchors; `--self-test` writes
+  disposable fixture state; `--install` also merges local host settings. The audit query
+  prunes its own expired rows. None requires the app, a model call or a user workspace.
+- Use temporary DBs, notebooks, Git fixtures and output paths. Keep translation disabled
+  and models fake; never use the live queue as a fixture. The browser fixture uses
+  `python -B -m tests.browser_server`, then the relevant README browser script; restart
+  it between scripts. Use `src/tickets/server.py` so SSE shutdown stays bounded.
+- `python -m tickets` starts the real configured workspace: it may create/migrate stores,
+  recover notes and run enabled model workers. It is not a smoke test. Even maintenance
+  previews and `recover --check` open/initialize the catalog; their names do not promise
+  a side-effect-free DB open. Use explicit temporary paths when verifying them.
+- `recover` without `--check` restores files; cleanup/organization `--apply` changes
+  records. `--listen` exposes an unauthenticated service. Run these against a real
+  workspace only within authorization that covers their effects and target.
+- The demo has temporary data and disabled translation; sending chat can still call a
+  configured, enabled Copilot. `tests.live_*` makes paid calls. Do not use mutating,
+  network-backed, paid-model or outside-workspace operations merely as smoke tests.
+- Test model contracts with fixtures first. Spend a real call when it resolves a live-route
+  uncertainty a fixture cannot, using authorized data. State what it should settle and
+  report the result; cost economy does not override system health or relax privacy.
+- Start Windows helpers hidden and stop only owned processes. Verify absolute targets
+  before moves/deletion. Do not change global tool settings to make a local check pass.
+
+## Verification expectations
+
+Use the [task map](DESIGN.md#navigation) and [README checks](README.md#api-and-verification)
+to select proportionate verification:
+
+- Data, schema and write changes: exercise old formats, version conflicts, idempotent
+  retries and missing/unavailable input with temporary state.
+- Drydock changes: prove equal local IDs stay separate across HTTP, MCP, proposals,
+  recovery and browser switching. Preserve the legacy default graph.
+- Notebook/recovery changes: test exact bytes, external conflicts and interrupted writes
+  in temporary notebooks; never clear live recovery evidence as a test.
+- UI changes: run affected JS checks and inspect the disposable browser fixture, including
+  focus/IME, acknowledged saves, conflicts and selected context where affected.
+- Model/configuration changes: mock requests and streams first; check disabled defaults,
+  missing credentials, bounded context, incomplete responses and sanitized failures.
+- Packaging changes: verify archive contents and an installed wheel outside the checkout
+  when runtime/package contents change. Guidance-only manifest changes need source-archive
+  and link checks; they do not require a live app or a paid call.
+- Bug fixes: add a focused `unittest` regression when practical. Documentation changes:
+  verify local links/anchors, command locations, English maintained prose and `git diff --check`.
 
 ## Records and completion
 
-Update DESIGN for architecture, README/MCP for operation/API contracts and the notebook guide
-for note semantics. Record consequential choices under `docs/decisions/`, preserving dated
-reasoning and provenance; summarize visible changes in [CHANGELOG.md](CHANGELOG.md). Use
-relative links with verified anchors. The local extraction decision carries earlier provenance; do not introduce parent-document dependencies.
+Update DESIGN for architecture, README/MCP for operation and protocol, and the notebook
+guide for note semantics. Use the [record guide](docs/README.md) for consequential decisions,
+non-obvious testable mechanisms, provenance and [changelog maintenance](CHANGELOG.md#maintenance).
+Keep one authority per rule and link to the relevant section. When code and documentation
+disagree, establish the behavior and correct the wrong authority in the same task.
 
-Finish at the source-of-truth layer, preserve unrelated/private state, keep deterministic
-and unknown/fallback behavior, pass isolated verification and update the required records.
-Finish authorized work before ending the turn; completed work needs no trailing offer.
+A change is complete when:
 
-## Standalone boundaries
-
-Keep runtime code/assets under `src/tickets/`, synthetic tests under `tests/`, and working
-data outside the installed package. Use `Path(__file__)` for packaged resources, never the
-caller's directory. External data/config paths must be absolute. Read/write UTF-8 explicitly.
-Python 3.10+ is supported; dependencies belong in `pyproject.toml`. Do not add a license to
-project-authored code without the owner's decision; preserve vendored licenses and hashes.
-
-Models and Git associations are off/unconfigured by default. No private notebook, source
-queue, old organization plan, `.env`, local paths or old Git history belongs in a generic
-source snapshot. The original source checkout retains those records. A code copy is not a
-live-data cutover. Workspaces need their own Git/paired-backup discipline; never claim the
-ignored SQLite DB is regenerable or that cloning this source restores a user's records.
+1. The requested behavior or guidance exists at the source-of-truth layer.
+2. Private state, secrets and unrelated worktree changes remain untouched.
+3. Identity, compatibility, retry and unknown/fallback contracts still hold.
+4. Proportionate isolated checks pass; unavailable or unsafe checks are reported honestly.
+5. Required records are updated, and the final focused diff and Git status are inspected.

@@ -5,6 +5,15 @@ in [MLD-DEC-002](docs/decisions/002-standalone-source-extraction.md).
 
 ## [Unreleased]
 
+- Added standalone offline sanity hooks and repeatable developer bootstrap for Codex,
+  Claude Code and root-session ZCode events. Local rules, one retry, visible failure,
+  checkout/host isolation and two-hour temporary audit require no model or app startup.
+  Bootstrap preserves unrelated settings and distinguishes installation from host trust
+  and live activation. See [MLD-DEC-005](docs/decisions/005-portable-sanity-bootstrap.md).
+- Completed standalone developer guidance: task navigation, a shared agent entry,
+  adaptable conversation language, current Drydock/storage and command boundaries,
+  and local decision/record conventions. Corrected the schema-v4 backup path example.
+  See [MLD-DEC-004](docs/decisions/004-self-contained-development-contract.md).
 - Expanded Git ignore rules for SQLite sidecars, local environments, test outputs and
   system metadata while preserving example configuration and authored Markdown.
 
@@ -47,3 +56,11 @@ First Drydock test release; no live data has been moved from the original ticket
 - Added local development and recovery contracts. The
   [remaining deployment gates](DEPLOYMENT.md#remaining-migration-gates) separate source
   independence from a live-data cutover.
+
+## Maintenance
+
+Add notable user/operator-visible behavior and documentation-contract changes to Unreleased.
+At a release, move only shipped entries into a version-and-date section matching the
+distribution; keep an Unreleased section for later work. Do not invent a release merely to
+close a development task or turn the changelog into commit history. Preserve dated entries
+and link relevant [decisions](docs/README.md#decision-index) when they explain a tradeoff.

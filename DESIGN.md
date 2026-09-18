@@ -6,23 +6,72 @@ Earlier tradeoffs are carried in [the extraction record](docs/decisions/002-stan
 The repository-local [development contract](AGENTS.md) and
 [mixed recovery decision](docs/decisions/001-mixed-proposal-recovery.md) travel with the code.
 
+## Navigation
+
+Read only the row relevant to the task. Module paths are under `src/tickets/`; fixture
+paths are under `tests/`. Run commands from the repository root as described in
+[README verification](README.md#api-and-verification).
+
+| Task | Contract and implementation | Focused fixtures |
+|---|---|---|
+| Graph identity and switching | [Drydock isolation](#drydock-graph-isolation); `drydocks.py`, `app.py`, `static/drydocks.js` | `test_drydocks.py`, `browser.drydocks.mjs` |
+| Ticket schema, dependencies and retries | [Transactions](#schema-and-transactions); `db.py`, `models.py`, `service.py` | `test_graph.py`, `test_writes.py` |
+| Save, conflict and live refresh | [Editor contract](#attention-based-saving-and-live-refresh); `static/draft.js`, `static/graph.js` | `draft.test.mjs`, `browser.smoke.mjs`, `browser.viewport.mjs` |
+| Layout, selection and grouping | [Rendering](#rendering-and-grouping); `static/layout*.js`, `static/layouts/` | `layout.test.mjs`, `browser.layout.mjs`, `browser.viewport.mjs` |
+| Notes, typed relations and premises | [Exploration](#exploration-semantics-and-markdown-authority), [file contract](docs/notebook.md#file-contract); `notes.py`, `note_ops.py` | `test_notes.py`, `test_note_ops.py`, `browser.notes.mjs` |
+| MCP, proposals and recovery | [Review](#reviewed-proposals-in-the-graph-page-41), [MCP protocol](MCP.md#7-ordered-apply-and-recovery); `mcp_surface.py`, `proposals.py`, `writes.py`, `review.py` | `test_mcp_surface.py`, `test_proposals.py`, `test_proposal_apply.py`, `test_review.py`, `test_review_cleanup.py`, `test_writes.py`, `browser.proposals.mjs` |
+| Model or Git boundary | [Copilot](#copilot-boundary), [Git](#git-boundary); `llm.py`, `copilot.py`, `translate.py`, `gitinfo.py` | `test_llm_stream.py`, `test_standalone.py`, `test_gitinfo.py` |
+| Configuration, launch or packaging | [Source ownership](#existing-single-graph-semantics), [distribution checks](README.md#build-and-verify-the-distribution); `config.py`, `__main__.py`, `server.py`, root manifests | `test_standalone.py`, `test_shutdown.py`; installed-wheel checks |
+| Development hooks and bootstrap | [Lifecycle](#development-agent-hooks); repository-relative [tools/agent_hooks/](tools/agent_hooks/) | `test_startup_sanity.py`, `test_sanity_audit.py`, `test_agent_bootstrap.py` |
+| Development guidance and records | [AGENTS](AGENTS.md), [record guide](docs/README.md), [MLD-DEC-004](docs/decisions/004-self-contained-development-contract.md) | Local links/anchors, command routes, focused diff and whitespace |
+
 ## Inherited design principles
 
-Sharing design logic is itself a principle. Moldloft, the life OS and the workspace share
-human judgement, truthful state, durable sources, low maintenance and preserved attention
-as design constraints. A separate repository or independent deployment retains that logic;
-interfaces, storage and dependencies may differ. Departures from a shared principle need
-an explicit, reasoned decision. See the repository-local [principles](AGENTS.md#principles) and
-[inherited decisions](docs/decisions/002-standalone-source-extraction.md#inherited-decisions).
+Moldloft retains human judgement, truthful state, durable sources, low maintenance and
+preserved attention as design constraints. Sharing this logic across components and
+repositories is itself a principle; interfaces, storage and dependencies may differ.
+Departures need an explicit, reasoned local decision. The operative
+[principles](AGENTS.md#principles) and necessary
+[inherited reasoning](docs/decisions/002-standalone-source-extraction.md#inherited-decisions)
+are recorded here without requiring another workspace.
 
 Attention cost includes reading, choosing, confirming, switching context and maintenance.
 A technically correct feature must still justify another screen, prompt or recurring duty.
 Whole-editor attention-change saving reduces repeated save decisions; stable selection and
 bounded local views reduce reorientation; proposal diffs preserve the owner's meaningful
-acceptance decision. These are local applications of the same rule as the workspace's short
-review loop and the OS's sparse daily push. The OS's numerical caps do not set ticket quotas.
+acceptance decision. These mechanisms serve the work in view; they do not impose activity
+quotas or recurring reporting duties on the operator.
 Reducing repetitive interaction must preserve acknowledged saves, visible conflicts and
 explicit acceptance of model-proposed edits.
+
+## Development-agent hooks
+
+`tools/agent_hooks/` is development-only, standard-library code carried in the source
+distribution, outside the application wheel. `startup_sanity.py` selects one locally
+anchored rule at SessionStart/SubagentStart, emits a Moldloft-specific challenge, and grades
+the final receipt at Stop/SubagentStop. Claude Code and Codex have all four events; the
+retained ZCode adapter has root start/stop only. Selection is deterministic for a start
+context; a random challenge ID rejects replay from an earlier start. One failed receipt
+can continue the agent once; another failure or unavailable infrastructure fails open visibly.
+
+`sanity_audit.py` records process entry/outcome without payloads, transcripts, answers or
+source anchors. Default state lives under OS temporary storage, partitioned by a hash of
+the checkout path, then host, then hashed session/agent scope. Pending files and audit rows
+expire after two hours on access; there is no timer or durable history guarantee. Missing
+host/model identity stays unknown. Audit failure cannot change a stop decision or retry budget.
+
+`bootstrap.py` validates rule anchors, exercises generated commands with synthetic inputs,
+and merges only its own handlers into ignored local host configuration. Absolute interpreter
+and script paths support unrelated working directories; reinstalling relocates those paths.
+Windows Codex invocation encodes a literal PowerShell argv command to preserve spaces,
+quotes and dollar signs. Other adapters use native argument arrays. A repeated install
+preserves already-correct bytes. Explicit disabling, malformed settings and concurrent edits
+are reported, not overwritten. It does not install packages or change host trust.
+
+[MLD-DEC-005](docs/decisions/005-portable-sanity-bootstrap.md) records source provenance and
+storage exceptions. [Operations and activation](docs/agent-hooks.md) distinguish passing
+synthetic verification, installed configuration and real host execution. The application,
+Copilot and MCP request paths do not import or depend on this development tool.
 
 ## Name
 
@@ -36,10 +85,9 @@ geometry from a lines plan rather than authoring it, which is the same commitmen
 loft sits **before and beside fabrication**, not inside it; this tool likewise owns structure
 and premises, not execution. And a contradiction found on the loft floor is meant to be
 cheaper than the same contradiction found in a finished hull, which is what the premise
-review hints in *Exploration semantics* are for. It also stays inside the workspace's
-existing fleet vocabulary.
+review hints in *Exploration semantics* are for.
 
-No Chinese name is assigned; the English name is used in both languages.
+Moldloft is the product name; keep proper names stable across translated views.
 
 The repository and distribution are `Moldloft` / `moldloft`. The Python package remains
 `tickets`; existing `TICKETS_*` names, stored IDs and MCP tool names remain compatible.
