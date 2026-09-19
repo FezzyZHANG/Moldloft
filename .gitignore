@@ -70,3 +70,5 @@ Desktop.ini
 /.codex/.hooks.json.*.tmp
 /.claude/.settings.local.json.*.tmp
 /.zcode/.config.json.*.tmp
+/.moldloft/*.local.json
+/.moldloft/.*.tmp

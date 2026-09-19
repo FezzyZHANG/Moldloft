@@ -14,6 +14,12 @@ local Drydock IDs do not complete the deployment identity or export/restore gate
 
 ## Standalone verification
 
+Containing-project deployments have a repeatable [install/check/run entry](docs/project-installation.md).
+The default is editable source in an isolated environment; wheel snapshots remain supported.
+Existing data paths can be selected without opening them during installation. A running
+service is not restarted; select a separate environment when staging an update. This
+integration does not complete the data migration, backup or deployment-identity gates below.
+
 Use a fresh virtual environment and the [installation instructions](README.md#run).
 For development, install `.[dev]`; run the Python and Node checks in
 [README](README.md#api-and-verification). They use synthetic state and fake models.
@@ -25,6 +31,11 @@ Verify empty graph, ticket/note writes, proposal submission/review, MCP initiali
 restart, and local templates/CSS/JS/ELK worker availability. Check both archive inventories
 for excluded data and verify the [vendored hashes](src/tickets/static/vendor/elk/README.md).
 Keep original ELK bytes, license and source references in both distributions.
+
+`python -B tests/verify_project_distribution.py` automates temporary parent-project
+installation in both modes, source-independent wheel operation, MCP/assets/restart checks
+and archive inventories. It can download dependencies, but uses only allowlisted source
+copies and synthetic DB/notebook paths. Host activation is still a separate observation.
 
 The supported launch is one localhost process. Reload is opt-in; there is no service,
 automatic startup, public listener, authentication system or PyPI publication in this

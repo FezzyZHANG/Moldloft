@@ -5,6 +5,12 @@ in [MLD-DEC-002](docs/decisions/002-standalone-source-extraction.md).
 
 ## [Unreleased]
 
+- Added repeatable containing-project install/check/run, editable by default with optional
+  wheel snapshots, portable configuration, isolated environments and generic instance
+  identification. Parent principles are optional; Codex, Claude Code and ZCode hooks use
+  explicit ownership and disjoint parent/source scopes. Installation preserves running
+  environments and application data. See [MLD-DEC-006](docs/decisions/006-containing-project-installation.md).
+
 - Added standalone offline sanity hooks and repeatable developer bootstrap for Codex,
   Claude Code and root-session ZCode events. Local rules, one retry, visible failure,
   checkout/host isolation and two-hour temporary audit require no model or app startup.

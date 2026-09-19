@@ -63,7 +63,7 @@ class StartupSanityTests(unittest.TestCase):
         return result, path, state
 
     def test_every_question_still_has_an_anchor_in_agents_md(self):
-        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        agents = sanity.contract_text(ROOT / "AGENTS.md")
         self.assertEqual({question.region for question in sanity.QUESTIONS},
                          {"front", "middle", "late"})
         for question in sanity.QUESTIONS:
@@ -84,7 +84,7 @@ class StartupSanityTests(unittest.TestCase):
         self.assertTrue(path.exists())
         self.assertEqual(state["source"], "AGENTS.md")
         self.assertIn(" ".join(state["source_anchor"].split()),
-                      " ".join((ROOT / "AGENTS.md").read_text(encoding="utf-8").split()))
+                      " ".join(sanity.contract_text(ROOT / "AGENTS.md").split()))
         self.assertFalse(state["retry_used"])
 
     def test_subagent_start_names_its_own_hook_event(self):
@@ -101,7 +101,7 @@ class StartupSanityTests(unittest.TestCase):
         self.assertEqual(first["question_id"], second["question_id"])
 
     def test_representative_start_identities_reach_every_question(self):
-        agents = (ROOT / "AGENTS.md").read_text(encoding="utf-8")
+        agents = sanity.contract_text(ROOT / "AGENTS.md")
         questions = sanity._valid_questions(agents)
         selected_ids = set()
         for index in range(256):

@@ -172,7 +172,7 @@ def create_app(db_path=None, *, notes_path=None, repo_roots=None, translator=_DE
             return JSONResponse({"message": "Request too large"}, status_code=413)
         path = request.url.path
         scoped_request = path in ("/", "/graph") or path.startswith(("/tickets", "/api/"))
-        if scoped_request and not path.startswith("/api/drydocks"):
+        if scoped_request and not path.startswith("/api/drydocks") and path != "/api/instance":
             try:
                 selections = request.query_params.getlist("drydock")
                 if len(selections) > 1:

@@ -13,6 +13,7 @@ index does not require loading every linked document or any user's working noteb
 | [MCP](../MCP.md) | Agent read/proposal protocol and human review boundary. |
 | [Notebook](notebook.md) | Authored Markdown schema, premise semantics and file writes. |
 | [Agent hooks](agent-hooks.md) | Offline lifecycle checks, self-bootstrap, host activation and short-lived audit. |
+| [Project installation](project-installation.md) | Explicit parent installation, runtime selection, adopted principles and configuration ownership. |
 | [DEPLOYMENT](../DEPLOYMENT.md) | Distribution verification and remaining live-migration gates. |
 | [CHANGELOG](../CHANGELOG.md#unreleased) | Notable user/operator-visible changes. |
 
@@ -43,6 +44,7 @@ index does not require loading every linked document or any user's working noteb
 | [MLD-DEC-003](decisions/003-drydock-graph-isolation.md) | Give each Drydock an independent graph store. |
 | [MLD-DEC-004](decisions/004-self-contained-development-contract.md) | Keep development guidance self-contained and communication adaptable. |
 | [MLD-DEC-005](decisions/005-portable-sanity-bootstrap.md) | Migrate the offline sanity lifecycle with local, repeatable bootstrap and bounded temporary state. |
+| [MLD-DEC-006](decisions/006-containing-project-installation.md) | Install into an explicit containing project with optional shared principles and scoped hooks. |
 
 ## Decision template
 

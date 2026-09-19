@@ -1,11 +1,17 @@
 # Development-agent sanity hooks
 
 The hook checks one rule from [AGENTS](../AGENTS.md#startup-sanity-and-self-bootstrap)
+and its linked shared principles
 without reading application data or making another model call. It is a small attention
 canary, not a security control or proof that every instruction was understood. The app
 and its optional model features do not depend on it.
 
 ## Bootstrap
+
+For a containing project, use [project installation](project-installation.md). That entry
+configures selected parent and child hooks together. The direct commands below remain
+the standalone source-development route. Both read the local AGENTS contract and its
+linked [shared principle authority](agent-principles.md).
 
 From the repository root, use the Python 3.10+ interpreter you want hooks to keep using:
 
@@ -136,3 +142,21 @@ archive carries this guide, tools and tests; generated local settings and tempor
 are excluded. The wheel remains the application package only.
 
 Source and storage choices are recorded in [MLD-DEC-005](decisions/005-portable-sanity-bootstrap.md).
+
+## Containing-project profiles
+
+Bootstrap separates the source from an optional `--target-project <parent>` and carries
+an `--installation-id` owner. `--principles shared` selects the common-principle profile;
+otherwise a parent gets entry context without a graded challenge. Prefer the project
+installer so its manifest, managed entry documents and child hooks stay coordinated.
+
+The parent profile ignores a session cwd inside the source checkout. Its child development
+profile checks the full Moldloft contract there. This applies to real session/subagent
+directories, not to a `cd` within one shell command. Codex/Claude retain root/subagent
+events; ZCode retains root events only, with live delivery still unverified.
+
+State uses the target project hash rather than always using the source checkout hash.
+Saved handler definitions in each target's ignored `.moldloft/hooks.local.json` allow
+safe relocation. Installation only owns explicitly marked handlers or canonical legacy
+commands for this exact source. Manual changes are reported, unrelated handlers remain,
+and no trust storage is edited. See [MLD-DEC-006](decisions/006-containing-project-installation.md).

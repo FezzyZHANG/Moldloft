@@ -21,6 +21,29 @@ local to this repository and follows the current user's communication preference
 [DEPLOYMENT.md](DEPLOYMENT.md) distinguishes this independent source baseline from a future
 live-workspace migration. There is no authentication or multi-user deployment support.
 
+## Install in a containing project
+
+For a nested checkout or Git submodule, run from the containing project:
+
+```text
+python Moldloft/tools/project.py install --project . --host codex --principles shared
+python Moldloft/tools/project.py check --project .
+python Moldloft/tools/project.py run --project .
+```
+
+This creates an isolated editable environment, a portable project manifest and selected
+parent/child agent wiring. Shared principles are optional; omit `--principles shared`
+to keep only application/development entry guidance. Hosts are selected explicitly with
+repeatable `--host codex|claude|zcode`; omit hosts for application-only installation.
+The parent need not be a Git repository. Use `--db`, `--notes` and `--port` to retain an
+existing workspace. Installation never opens its data or starts/restarts its server.
+
+`--mode wheel` installs a snapshot instead. Re-run installation after dependency changes
+or relocation; `check` is offline and read-only. To prepare an update while a service
+runs, select a fresh `--environment` and retain its active environment until it stops.
+See [project installation](docs/project-installation.md) for defaults, configuration,
+ownership, failure recovery and isolated distribution verification.
+
 ## Developer bootstrap
 
 For a new development checkout, use an existing Python 3.10+ interpreter from its root:

@@ -22,6 +22,7 @@ paths are under `tests/`. Run commands from the repository root as described in
 | MCP, proposals and recovery | [Review](#reviewed-proposals-in-the-graph-page-41), [MCP protocol](MCP.md#7-ordered-apply-and-recovery); `mcp_surface.py`, `proposals.py`, `writes.py`, `review.py` | `test_mcp_surface.py`, `test_proposals.py`, `test_proposal_apply.py`, `test_review.py`, `test_review_cleanup.py`, `test_writes.py`, `browser.proposals.mjs` |
 | Model or Git boundary | [Copilot](#copilot-boundary), [Git](#git-boundary); `llm.py`, `copilot.py`, `translate.py`, `gitinfo.py` | `test_llm_stream.py`, `test_standalone.py`, `test_gitinfo.py` |
 | Configuration, launch or packaging | [Source ownership](#existing-single-graph-semantics), [distribution checks](README.md#build-and-verify-the-distribution); `config.py`, `__main__.py`, `server.py`, root manifests | `test_standalone.py`, `test_shutdown.py`; installed-wheel checks |
+| Containing-project installation | [Project integration](#containing-project-integration), [operation](docs/project-installation.md); `project_config.py`, `project_runtime.py`, `tools/project.py` | `test_project_install.py`, `test_project_runtime.py`, `verify_project_distribution.py` |
 | Development hooks and bootstrap | [Lifecycle](#development-agent-hooks); repository-relative [tools/agent_hooks/](tools/agent_hooks/) | `test_startup_sanity.py`, `test_sanity_audit.py`, `test_agent_bootstrap.py` |
 | Development guidance and records | [AGENTS](AGENTS.md), [record guide](docs/README.md), [MLD-DEC-004](docs/decisions/004-self-contained-development-contract.md) | Local links/anchors, command routes, focused diff and whitespace |
 
@@ -56,7 +57,7 @@ can continue the agent once; another failure or unavailable infrastructure fails
 
 `sanity_audit.py` records process entry/outcome without payloads, transcripts, answers or
 source anchors. Default state lives under OS temporary storage, partitioned by a hash of
-the checkout path, then host, then hashed session/agent scope. Pending files and audit rows
+the target project path, then host, then hashed session/agent scope. Pending files and audit rows
 expire after two hours on access; there is no timer or durable history guarantee. Missing
 host/model identity stays unknown. Audit failure cannot change a stop decision or retry budget.
 
@@ -66,12 +67,46 @@ and script paths support unrelated working directories; reinstalling relocates t
 Windows Codex invocation encodes a literal PowerShell argv command to preserve spaces,
 quotes and dollar signs. Other adapters use native argument arrays. A repeated install
 preserves already-correct bytes. Explicit disabling, malformed settings and concurrent edits
-are reported, not overwritten. It does not install packages or change host trust.
+are reported, not overwritten. Bootstrap does not install packages or change host trust.
+Handlers have explicit ownership and saved generated definitions. Legacy migration accepts
+canonical launchers for the exact source only. Parent profiles inject entry context or
+sample the adopted shared principles; child sessions retain the full development contract.
+Parent handlers suppress their challenge inside the source directory, avoiding two receipts.
 
 [MLD-DEC-005](docs/decisions/005-portable-sanity-bootstrap.md) records source provenance and
 storage exceptions. [Operations and activation](docs/agent-hooks.md) distinguish passing
 synthetic verification, installed configuration and real host execution. The application,
 Copilot and MCP request paths do not import or depend on this development tool.
+
+## Containing-project integration
+
+`tools/project.py` is a standard-library source entry for install/check/run. Its source
+root, target project, isolated interpreter and application data are distinct locations.
+The versioned project manifest is the portable authority. Local receipts record resolved
+paths, package provenance, dependency metadata hash and managed-document fingerprints;
+they are regenerable evidence, not an authoritative application store or private-settings
+backup. Correct installs preserve file bytes; drift, manual edits and disabled configuration
+are diagnosed before writes. Partial multi-file failure remains visible and rerunnable.
+
+Editable mode binds runtime code to the selected checkout; wheel mode records a content
+fingerprint and installed artifact provenance. The read-only check inspects metadata,
+dependency consistency and generated wiring without importing application modules or
+opening databases. Hook fixtures are separate from real host activation. Install can use
+the package index, but hooks and checks cannot trigger dependency installation.
+
+`project_config.py` is standard-library manifest validation shared by source tooling and
+the wheel. `project_runtime.py` loads that explicitly named configuration, selects absolute
+data paths and starts localhost with models/reload disabled. The generic instance route
+has no Drydock selection and supports project-specific compatibility aliases. A matching
+process is reused; unrelated or differently configured instances are rejected. A running
+environment is preserved: installation can stage another environment for the next launch
+without stopping the current process or touching its application data.
+
+Common principles have one source in `docs/agent-principles.md`. Moldloft adopts them
+through AGENTS; parents opt in through managed references. Source development policy is
+not automatically promoted into a containing project's unrelated work. See
+[MLD-DEC-006](docs/decisions/006-containing-project-installation.md) and
+[operation](docs/project-installation.md).
 
 ## Name
 

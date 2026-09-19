@@ -6,7 +6,8 @@ stop hook checks only the final assistant message.  A failed check may continue
 the agent once; a second failure is reported visibly and allowed through so a
 broken or confused model cannot trap a session in a loop.
 
-This module deliberately reads no project data other than ``AGENTS.md`` and
+This module reads only the selected contract (``AGENTS.md`` and its linked
+shared principles, or the adopted shared principles alone) and
 uses only the Python standard library.  ``handle_hook`` accepts an explicit
 state directory so tests and other callers never need to touch real hook state.
 """
@@ -180,6 +181,19 @@ def _valid_questions(agents_text: str) -> list[Question]:
     return [question for question in QUESTIONS if " ".join(question.anchor.split()) in normalized]
 
 
+def contract_text(path: Path | str) -> str:
+    """Read only the named contract and its known repository-local shared authority."""
+    path = Path(path)
+    text = path.read_text(encoding="utf-8")
+    if path.name == "AGENTS.md":
+        shared = path.parent / "docs/agent-principles.md"
+        if shared.exists():
+            if not shared.resolve().is_relative_to(path.parent.resolve()):
+                raise SanityUnavailable("shared principles resolve outside the checkout")
+            text += "\n" + shared.read_text(encoding="utf-8")
+    return text
+
+
 def _choose_question(
     questions: list[Question], payload: dict[str, object], scope: str
 ) -> Question:
@@ -234,7 +248,7 @@ def _additional_context(question: Question, challenge_id: str) -> str:
     return "\n".join(
         (
             "<moldloft-sanity>",
-            "This is an offline attention check drawn from the repository's AGENTS.md.",
+            "This is an offline attention check drawn from the adopted development contract.",
             f"Question [{question.id}]: {question.prompt}",
             "At the end of your final assistant message, append exactly one hidden comment",
             "in this shape, replacing ANSWER with the selected token:",
@@ -259,7 +273,7 @@ def _start(
     # A new start supersedes any abandoned challenge for this exact scope.  Clear
     # it first so a later startup failure cannot make Stop grade stale state.
     path.unlink(missing_ok=True)
-    agents_text = Path(agents_path).read_text(encoding="utf-8")
+    agents_text = contract_text(agents_path)
     questions = _valid_questions(agents_text)
     if not questions:
         raise SanityUnavailable("AGENTS.md contains none of the known rule anchors")
@@ -275,7 +289,7 @@ def _start(
         "challenge_id": challenge_id,
         "expected_answer": question.expected,
         "question_id": question.id,
-        "source": "AGENTS.md",
+        "source": Path(agents_path).name,
         "source_anchor": question.anchor,
         "source_region": question.region,
         "source_section": question.section,
@@ -369,6 +383,9 @@ def handle_hook(
     agents_path: Path | str = AGENTS_PATH,
     challenge_id_factory: Callable[[], str] | None = None,
     audit: dict[str, object] | None = None,
+    project_root: Path | None = None,
+    source_root: Path = ROOT,
+    profile: str = "development",
 ) -> dict[str, object] | None:
     """Handle one lifecycle hook payload without reading stdin or writing stdout."""
 
@@ -379,13 +396,33 @@ def handle_hook(
     audit.update(llm=model, llm_source="payload" if model else None)
     event = _event_name(payload)
     audit["event"] = event if event in sanity_audit.EVENTS else None
+    intro = ""
+    if project_root is not None:
+        project_root, source_root = project_root.resolve(), source_root.resolve()
+        cwd_value = payload.get("cwd", str(Path.cwd()))
+        if not isinstance(cwd_value, str) or not Path(cwd_value).is_absolute():
+            raise SanityUnavailable("hook cwd must be an absolute path")
+        cwd = Path(cwd_value).resolve()
+        if not cwd.is_relative_to(project_root) or (profile != "development" and cwd.is_relative_to(source_root)):
+            audit["outcome"] = "ignored"
+            return None
+        if profile != "development":
+            intro = (f"Moldloft is installed in {source_root}. Read {project_root / 'AGENTS.md'} "
+                     "for the project entry, run/check commands and application usage. "
+                     f"Before developing Moldloft, read {source_root / 'AGENTS.md'}.\n")
+            if profile == "entry":
+                audit["outcome"] = "ignored"
+                return ({"hookSpecificOutput": {"hookEventName": event, "additionalContext": intro}}
+                        if event in START_EVENTS else None)
+            agents_path = source_root / "docs/agent-principles.md"
+            intro += f"This project adopts the shared principles in {agents_path}; read them before answering.\n"
     session = _text_field(payload, "session_id", "thread_id", "conversation_id")
     if session:
         audit["session_hash"] = sanity_audit.identity(session)
     if event in START_EVENTS | STOP_EVENTS:
         audit["scope_hash"] = sanity_audit.identity(_scope(payload, event))
     if event in START_EVENTS:
-        return _start(
+        result = _start(
             payload,
             event,
             state_dir=state_dir,
@@ -393,6 +430,8 @@ def handle_hook(
             challenge_id_factory=challenge_id_factory or (lambda: secrets.token_hex(8)),
             audit=audit,
         )
+        result["hookSpecificOutput"]["additionalContext"] = intro + result["hookSpecificOutput"]["additionalContext"]
+        return result
     if event in STOP_EVENTS:
         return _stop(payload, event, state_dir=state_dir, audit=audit)
     audit["outcome"] = "ignored"
@@ -415,6 +454,9 @@ def main(
     agents_path: Path | str = AGENTS_PATH,
     challenge_id_factory: Callable[[], str] | None = None,
     host: str | None = None,
+    project_root: Path | None = None,
+    source_root: Path = ROOT,
+    profile: str = "development",
 ) -> int:
     """Read one hook JSON object and emit provider-neutral structured hook JSON."""
 
@@ -423,7 +465,7 @@ def main(
     host = host if host in sanity_audit.HOSTS else None
     # This opt-in override is for local fixture/diagnostic invocations only.
     override = state_dir if state_dir is not None else os.environ.get("MOLDLOFT_SANITY_STATE_DIR")
-    state_dir = Path(override) if override is not None else sanity_audit.state_directory(host=host)
+    state_dir = Path(override) if override is not None else sanity_audit.state_directory(project_root or source_root, host=host)
     if not state_dir.is_absolute():
         print(json.dumps(_fail_open_warning("the explicit state directory must be absolute")), file=target)
         return 0
@@ -464,6 +506,7 @@ def main(
             agents_path=agents_path,
             challenge_id_factory=challenge_id_factory,
             audit=audit,
+            project_root=project_root, source_root=source_root, profile=profile,
         )
     except json.JSONDecodeError:
         audit.update(outcome="error", error_type="JSONDecodeError")
@@ -500,5 +543,11 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--host", choices=sorted(sanity_audit.HOSTS))
     parser.add_argument("--state-dir", type=Path, help="Absolute isolated state directory for diagnostics")
+    parser.add_argument("--project-root", type=Path)
+    parser.add_argument("--source-root", type=Path, default=ROOT)
+    parser.add_argument("--profile", choices=("development", "shared", "entry"), default="development")
+    parser.add_argument("--installation-id", help="Stable owner of this generated handler")
     args = parser.parse_args()
-    raise SystemExit(main(host=args.host, state_dir=args.state_dir))
+    raise SystemExit(main(host=args.host, state_dir=args.state_dir,
+                         project_root=args.project_root, source_root=args.source_root,
+                         agents_path=args.source_root / "AGENTS.md", profile=args.profile))

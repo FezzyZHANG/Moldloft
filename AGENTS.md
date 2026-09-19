@@ -7,42 +7,32 @@ and uncertainty legible while preserving the operator's attention. Optimize for 
 state, useful human judgement, low maintenance and readable records that outlast the app;
 engagement, feature count and visible busyness are not success criteria.
 
-This is the authoritative development contract. It is complete within this repository;
+This is the authoritative development contract, including its linked shared principles. It is complete within this repository;
 tool-specific entry files point here. Shared principles travel across repositories, while
 mechanisms fit the project. [MLD-DEC-004](docs/decisions/004-self-contained-development-contract.md)
 records the guidance audit and the boundary between development language and stored content.
 
 ## Principles
 
-Changes that depart from these principles need a reasoned local decision before implementation.
+Read and apply [the shared principles](docs/agent-principles.md). Changes that depart
+from them need a reasoned local decision before implementation. Their concrete
+Moldloft application is:
 
-- **Budget attention.** Reading, choosing, confirming, switching context and maintenance
-  cost attention. Extra screens or recurring duties need a concrete benefit. Automate
-  repetitive logistics while preserving meaningful review. No points, streaks, compliance
-  rewards or proxy rankings of the operator's activity.
-- **Represent evidence honestly.** Missing input is unknown, not zero, false or success.
-  Intent, a model response, an accepted premise and completed work are distinct. Only an
-  explicitly `done` ticket releases its dependents. Keep exploration separate from execution.
-- **Keep a readable foundation.** Plain text and Git preserve authored rules and reasoning.
-  Layout, readiness and translations are derived. Keep data authorities explicit and
-  document the recovery limits of stores Git cannot restore.
-- **Preserve human judgement.** Copilot proposes ticket edits; MCP submits reviewed
+- Only an explicitly `done` ticket releases its dependents. Layout, readiness and
+  translations are derived; authored notes and SQLite records have distinct authorities.
+- Copilot proposes ticket edits; MCP submits reviewed
   ticket/note proposals. Neither gains an approval tool. Retain the original read basis,
   show amendments, and leave interrupted model responses incomplete.
-- **Protect privacy.** Read only task-relevant material. Model context is bounded,
+- Model context is bounded,
   deliberately authored attached text; never silently add contacts, sensors, raw history,
   code, diffs or credentials. Do not persist conversations or unapplied page-local drafts.
-- **Degrade visibly.** Missing models, Git roots or graph storage must stay visibly
+- Missing models, Git roots or graph storage must stay visibly
   unavailable. Keep ordinary editing usable when optional integrations fail. Product
   messages describe state without nagging, praise for compliance or invented certainty.
-- **Carry principles, not host assumptions.** Components and repositories retain these
-  constraints with suitable mechanisms. No parent checkout, private content, fixed daily
-  quota, theme, operator title or conversation language is required to develop Moldloft.
 
 ## Working with the user
 
-- Follow the current user's language and explicit communication preferences. Do not assume
-  a nickname or form of address. Write maintained documentation, design reasoning, code
+- Do not assume a nickname or form of address. Write maintained documentation, design reasoning, code
   comments, identifiers and commit-ready text in English.
 - Preserve the current UI text, stored field names and bilingual notebook format when
   unrelated to the task. These compatibility contracts do not dictate conversation language.

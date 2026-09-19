@@ -6,6 +6,7 @@ recursive-include src/tickets/templates *.html
 recursive-include src/tickets/static *.js *.css *.md
 recursive-include tests *.py *.mjs *.json
 recursive-include tools/agent_hooks *.py
+include tools/project.py
 prune data
 prune notes
 prune review

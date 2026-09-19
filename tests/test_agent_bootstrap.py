@@ -24,6 +24,8 @@ class BootstrapTests(unittest.TestCase):
         self.root = Path(self.temp.name) / "copy with 'quotes' $dollars and unicode-测试"
         self.root.mkdir()
         shutil.copyfile(ROOT / "AGENTS.md", self.root / "AGENTS.md")
+        (self.root / "docs").mkdir()
+        shutil.copyfile(ROOT / "docs/agent-principles.md", self.root / "docs/agent-principles.md")
         shutil.copytree(ROOT / "tools/agent_hooks", self.root / "tools/agent_hooks",
                         ignore=shutil.ignore_patterns("__pycache__"))
 
@@ -50,7 +52,7 @@ class BootstrapTests(unittest.TestCase):
         self.assertFalse((self.root / ".codex").exists())
 
     def test_wrapping_changes_do_not_expire_correct_rule_anchors(self):
-        text = (self.root / "AGENTS.md").read_text(encoding="utf-8")
+        text = sanity.contract_text(self.root / "AGENTS.md")
         self.assertEqual(len(sanity._valid_questions("\n".join(text.split()))), len(sanity.QUESTIONS))
 
     def test_missing_install_and_idempotent_reinstall_preserve_exact_bytes(self):
@@ -68,9 +70,12 @@ class BootstrapTests(unittest.TestCase):
         foreign = {"type": "command", "command": "fixture-only-foreign-check"}
         old = bootstrap.definitions("claude", Path(self.temp.name) / "old-copy")
         current = {"permissions": {"allow": ["Read"]}, "privateFixture": "preserve",
-                   "hooks": {**old, "PreToolUse": [{"matcher": "Read", "hooks": [foreign]}]}}
+                   "hooks": {**deepcopy(old), "PreToolUse": [{"matcher": "Read", "hooks": [foreign]}]}}
         current["hooks"]["Stop"][0]["hooks"].append(foreign)
         path = self.config("claude", current)
+        receipt = self.root / ".moldloft/hooks.local.json"
+        receipt.parent.mkdir()
+        receipt.write_text(json.dumps({"claude": {"development": old}}), encoding="utf-8")
         item = bootstrap.plan("claude", self.root)
         self.assertEqual(item["status"], "stale")
         bootstrap.apply_plans([item])
