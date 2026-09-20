@@ -5,6 +5,9 @@ in [MLD-DEC-002](docs/decisions/002-standalone-source-extraction.md).
 
 ## [Unreleased]
 
+- Local graph now offers upstream, downstream and both directions. Both follows each
+  direction separately, avoiding unrelated branches through shared neighbors; undirected
+  context links remain available in either direction.
 - Added repeatable containing-project install/check/run, editable by default with optional
   wheel snapshots, portable configuration, isolated environments and generic instance
   identification. Parent principles are optional; Codex, Claude Code and ZCode hooks use

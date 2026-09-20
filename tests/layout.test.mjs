@@ -95,6 +95,64 @@ test('typed links retain semantics through collapse, filtering and local neighbo
   assert.equal(graph.relations.length, 3, 'projection does not edit source relations');
 });
 
+test('local traversal keeps upstream and downstream paths separate at forks and joins', () => {
+  const graph = {tickets: Array.from({length: 9}, (_, i) => ticket(i + 1)), edges: [
+    [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [2, 7], [8, 4], [6, 9],
+  ].map(([blocker_id, blocked_id]) => ({blocker_id, blocked_id}))};
+  const before = structuredClone(graph);
+  const visit = (direction, depth = 3) => [...neighborhood(graph, 't:3', depth, null, direction)].sort();
+  assert.deepEqual(visit('upstream'), ['t:1', 't:2', 't:3']);
+  assert.deepEqual(visit('downstream'), ['t:3', 't:4', 't:5', 't:6']);
+  assert.deepEqual(visit('both'), ['t:1', 't:2', 't:3', 't:4', 't:5', 't:6']);
+  assert.deepEqual(visit(undefined), visit('both'), 'the default still preserves direction');
+  assert.deepEqual(visit('both', 1), ['t:2', 't:3', 't:4']);
+  assert.deepEqual(visit('both', 2), ['t:1', 't:2', 't:3', 't:4', 't:5']);
+  assert.deepEqual(visit('both', 99), visit('both', 3), 'depth remains bounded');
+  const reordered = {...graph, edges: [...graph.edges].reverse()};
+  assert.deepEqual([...neighborhood(reordered, 't:3', 3)].sort(), visit('both'));
+  assert.deepEqual(graph, before, 'local traversal never rewrites execution data');
+});
+
+test('typed local traversal respects arrows, undirected context, filters and cycles', () => {
+  const relation = (source, target, type, missing = false) => ({source, target, type, missing});
+  const graph = {tickets: [ticket(1), ticket(2)], edges: [{blocker_id: 1, blocked_id: 2}], relations: [
+    relation('note:n-premise', 'ticket:1', 'assumes'),
+    relation('note:n-evidence', 'note:n-premise', 'supports'),
+    relation('note:n-idea', 'note:n-evidence', 'option'),
+    relation('note:n-premise', 'note:n-side', 'option'),
+    relation('note:n-evidence', 'note:n-missing', 'relates', true),
+  ]};
+  assert.deepEqual([...neighborhood(graph, 't:1', 3, null, 'upstream')].sort(),
+    ['n:n-evidence', 'n:n-idea', 'n:n-premise', 't:1']);
+  assert.deepEqual([...neighborhood(graph, 'n:n-idea', 3, null, 'downstream')].sort(),
+    ['n:n-evidence', 'n:n-idea', 'n:n-premise', 'n:n-side', 't:1']);
+  assert.deepEqual([...neighborhood(graph, 't:1', 3, new Set(['requires']))].sort(), ['t:1', 't:2']);
+  assert.deepEqual([...neighborhood(graph, 't:1', 3, new Set(['assumes']), 'upstream')].sort(), ['n:n-premise', 't:1']);
+  assert.deepEqual([...neighborhood(graph, 't:1', 3, new Set())], ['t:1']);
+
+  graph.relations.push(relation('note:n-premise', 'note:n-evidence', 'relates'));
+  for (const direction of ['upstream', 'downstream', 'both']) {
+    for (const focus of ['n:n-premise', 'n:n-evidence']) {
+      assert.deepEqual([...neighborhood(graph, focus, 3, new Set(['relates']), direction)].sort(), ['n:n-evidence', 'n:n-premise']);
+    }
+  }
+  assert.deepEqual([...neighborhood(graph, 'n:n-evidence', 3, null, 'both')].sort(),
+    ['n:n-evidence', 'n:n-idea', 'n:n-premise', 'n:n-side', 't:1', 't:2'],
+    'a node reached in one direction must still be explored independently in the other');
+});
+
+test('directional projection retains containment without traversing siblings', () => {
+  const graph = {tickets: [ticket(1), ticket(2, 1), ticket(3, 1), ticket(4), ticket(5)],
+    edges: [{blocker_id: 4, blocked_id: 2}, {blocker_id: 2, blocked_id: 5}]};
+  const ids = filter => flatten(project(graph, new Set(), filter)).filter(n => n.data?.ticket).map(n => n.data.ticket.id).sort();
+  assert.deepEqual(ids({focus: 't:2', depth: 3, direction: 'upstream'}), [1, 2, 4]);
+  assert.deepEqual(ids({focus: 't:2', depth: 3, direction: 'downstream'}), [1, 2, 5]);
+  assert.deepEqual(ids({focus: 't:2', depth: 3}), [1, 2, 4, 5]);
+  assert.deepEqual(ids({direction: 'upstream'}), [1, 2, 3, 4, 5], 'global projection ignores local direction');
+  const collapsed = project(graph, new Set(['t:1']), {focus: 't:2', depth: 3, direction: 'upstream'});
+  assert.deepEqual(collapsed.edges.map(e => [e.sources[0], e.targets[0]]), [['t:4', 't:1']]);
+});
+
 test('ELK handles parent endpoints in either dependency direction', async () => {
   for (const [blocker_id, blocked_id] of [[1, 2], [2, 1]]) {
     const input = project({tickets: [ticket(1), ticket(2, 1)], edges: [{blocker_id, blocked_id}]});

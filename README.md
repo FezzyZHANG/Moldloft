@@ -210,9 +210,12 @@ options use dash-dot lines with diamond endpoints. Labels and a filterable legen
 color. Only execution prerequisites block tasks. Premise review hints follow dependencies
 without rewriting task status. The node label **No execution blockers** makes that scope explicit.
 
-**Local graph** shows one to three hops around the selected ticket or note. Hover highlights
-its immediate connections; the inspector lists related content and backlinks with bounded
-text previews. Filters, note visibility and group collapse change only the view. These
+**Local graph** shows one to three hops around the selected ticket or note. Choose upstream
+(上游, against arrows), downstream (下游, along arrows), or both (双向, the default).
+Both combines two separate traversals, so shared prerequisites or successors do not pull
+in side branches. Undirected `relates` links remain traversable both ways in every mode.
+Hover highlights immediate connections; the inspector lists related content and backlinks
+with bounded text previews. Filters, note visibility and group collapse change only the view. These
 interactions reference Obsidian's [local graph](https://obsidian.md/help/plugins/graph),
 [backlinks](https://obsidian.md/help/plugins/backlinks) and
 [page preview](https://obsidian.md/help/plugins/page-preview); no Obsidian code is bundled.
@@ -494,6 +497,11 @@ rerunning the smoke script. Screenshots go to the OS temporary directory.
 Run `node tests/browser.notes.mjs` against the fixture server to exercise note
 saving/IME/conflicts, bilingual abstract lookup, typed links, backlinks, local graph and
 separate note creation. Restart the fixture before each browser script.
+
+`node tests/browser.local.mjs` checks upstream/downstream/both local traversal for tickets
+and notes, fork/join exclusion, depth and relation filters, selected context and narrow
+controls. It mocks graph reads and verifies that changing the view sends no writes.
+Restart the fixture before this script too.
 
 `node tests/browser.drydocks.mjs` covers graph creation/rename, lost acknowledgements,
 same-ID isolation, MCP review and Copilot apply in a named graph, independent SSE streams,

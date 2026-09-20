@@ -33,7 +33,12 @@
         <button class="ghost" id="collapse-groups">收起组</button><button class="ghost" id="expand-all">展开</button>
         <button class="ghost" id="zoom-out" aria-label="缩小">−</button><button class="ghost" id="zoom-in" aria-label="放大">＋</button><button class="ghost" id="fit">适应视图</button>
       </div>
-      <div class="graph-scope"><button class="ghost" id="local-graph" aria-pressed="false">局部图谱</button><label>深度 <select id="local-depth" aria-label="局部图谱深度"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label><label><input id="show-notes" type="checkbox" checked>显示笔记</label><span id="scope-label">全局</span></div>
+      <div class="graph-scope">
+        <button class="ghost" id="local-graph" aria-pressed="false">局部图谱</button>
+        <label>方向 <select id="local-direction" aria-label="局部图谱方向" title="上游逆箭头追溯，下游沿箭头展开；双向分别遍历后合并。关联关系始终双向。"><option value="both">双向</option><option value="upstream">上游</option><option value="downstream">下游</option></select></label>
+        <label>深度 <select id="local-depth" aria-label="局部图谱深度"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></label>
+        <label><input id="show-notes" type="checkbox" checked>显示笔记</label><span id="scope-label">全局</span>
+      </div>
       <div id="relation-legend" class="relation-legend" aria-label="关系类型筛选"></div>
       <p id="graph-hint">箭头指向后续工单 · 父子容器表示任务拆解</p>
       <div class="canvas-host"><svg id="dag" role="group" aria-label="可交互的工单图" tabindex="0"></svg><p id="empty-graph" hidden>这里还没有工单。新建一项，或调整筛选。</p><span id="layout-status" role="status"></span></div>

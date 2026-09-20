@@ -6,27 +6,33 @@ export const noteKey = id => `n:${id}`;
 // Saved references have numeric IDs; reviewed previews can target new: aliases.
 const ticketRefId = ref => ref.startsWith('ticket:new:') ? ref.slice(7) : Number(ref.slice(7));
 
-export function neighborhood(graph, key, depth = 1, types = null) {
+export function neighborhood(graph, key, depth = 1, types = null, direction = 'both') {
   const pairs = [
     ...(types && !types.has('requires') ? [] : graph.edges.map(e => [ticketKey(e.blocker_id), ticketKey(e.blocked_id)])),
-    ...(graph.relations || []).filter(r => !r.missing && (!types || types.has(r.type))).map(r => [referenceKey(r.source), referenceKey(r.target)]),
+    ...(graph.relations || []).filter(r => !r.missing && (!types || types.has(r.type))).map(r => [referenceKey(r.source), referenceKey(r.target), r.type === 'relates']),
   ];
-  const found = new Set([key]); let frontier = new Set([key]);
-  for (let i = 0; i < Math.min(3, Math.max(1, depth)); i++) {
-    const next = new Set();
-    for (const [a, b] of pairs) {
-      if (frontier.has(a) && !found.has(b)) next.add(b);
-      if (frontier.has(b) && !found.has(a)) next.add(a);
+  function traverse(upstream) {
+    const found = new Set([key]); let frontier = new Set([key]);
+    for (let i = 0; i < Math.min(3, Math.max(1, depth)); i++) {
+      const next = new Set();
+      for (const [a, b, undirected] of pairs) {
+        if ((!upstream || undirected) && frontier.has(a) && !found.has(b)) next.add(b);
+        if ((upstream || undirected) && frontier.has(b) && !found.has(a)) next.add(a);
+      }
+      next.forEach(k => found.add(k)); frontier = next;
     }
-    next.forEach(k => found.add(k)); frontier = next;
+    return found;
   }
-  return found;
+  // Keep each direction's frontier separate so a shared neighbor cannot introduce a side branch.
+  if (direction === 'upstream') return traverse(true);
+  if (direction === 'downstream') return traverse(false);
+  return new Set([...traverse(true), ...traverse(false)]);
 }
 
 export function project(graph, collapsed = new Set(), filter = {}) {
   const byId = new Map(graph.tickets.map(t => [t.id, t]));
   const included = new Set();
-  const local = filter.focus ? neighborhood(graph, filter.focus, filter.depth, filter.types) : null;
+  const local = filter.focus ? neighborhood(graph, filter.focus, filter.depth, filter.types, filter.direction) : null;
   for (const t of graph.tickets) {
     if (local && !local.has(ticketKey(t.id))) continue;
     if (filter.group !== undefined && t.group_name !== filter.group) continue;

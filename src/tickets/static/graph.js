@@ -81,9 +81,10 @@ function draw() {
   const focus = notes.id ? noteKey(notes.id) : selected ? ticketKey(selected) : null;
   $('local-graph').disabled = !focus;
   $('local-graph').setAttribute('aria-pressed', String(localGraph));
-  $('scope-label').textContent = localGraph && focus ? `${notes.id ? '当前笔记' : '#' + selected} · ${$('local-depth').value} 层关系` : '全局';
+  const direction = $('local-direction');
+  $('scope-label').textContent = localGraph && focus ? `${notes.id ? '当前笔记' : '#' + selected} · ${direction.selectedOptions[0].textContent} · ${$('local-depth').value} 层关系` : '全局';
   diagram.render(displayed, collapsed, {group: groupFilter, status: $('status-filter').value, search: $('search').value.trim(),
-    focus: localGraph ? focus : null, depth: Number($('local-depth').value), types: visibleRelations, showNotes: $('show-notes').checked}).catch(report);
+    focus: localGraph ? focus : null, depth: Number($('local-depth').value), direction: direction.value, types: visibleRelations, showNotes: $('show-notes').checked}).catch(report);
 }
 const proposalStale = () => proposal && (proposal.drydock_id !== drydockId || proposal.base_revision !== graph.revision || proposal.notes_revision !== graph.notes_revision);
 
@@ -550,6 +551,7 @@ $('collapse-groups').onclick = () => runAction(() => { graph.tickets.forEach(t =
 $('expand-all').onclick = () => runAction(() => { collapsed.clear(); renderTree(); draw(); });
 $('local-graph').onclick = () => runAction(() => { localGraph = !localGraph; collapsed.clear(); groupFilter = undefined; $('search').value = ''; $('status-filter').value = ''; diagram.frameLocal = localGraph; draw(); });
 $('local-depth').onchange = () => { diagram.frameLocal = localGraph; draw(); };
+$('local-direction').onchange = () => { diagram.frameLocal = localGraph; draw(); };
 $('show-notes').onchange = scheduleDraw;
 for (const [type, title] of Object.entries(relationNames)) {
   const label = node('label', '', `relation-${type}`), input = node('input'); input.type = 'checkbox'; input.checked = true; input.value = type;

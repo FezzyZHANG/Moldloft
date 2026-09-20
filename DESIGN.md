@@ -17,7 +17,7 @@ paths are under `tests/`. Run commands from the repository root as described in
 | Graph identity and switching | [Drydock isolation](#drydock-graph-isolation); `drydocks.py`, `app.py`, `static/drydocks.js` | `test_drydocks.py`, `browser.drydocks.mjs` |
 | Ticket schema, dependencies and retries | [Transactions](#schema-and-transactions); `db.py`, `models.py`, `service.py` | `test_graph.py`, `test_writes.py` |
 | Save, conflict and live refresh | [Editor contract](#attention-based-saving-and-live-refresh); `static/draft.js`, `static/graph.js` | `draft.test.mjs`, `browser.smoke.mjs`, `browser.viewport.mjs` |
-| Layout, selection and grouping | [Rendering](#rendering-and-grouping); `static/layout*.js`, `static/layouts/` | `layout.test.mjs`, `browser.layout.mjs`, `browser.viewport.mjs` |
+| Layout, selection and grouping | [Rendering](#rendering-and-grouping); `static/layout*.js`, `static/layouts/` | `layout.test.mjs`, `browser.local.mjs`, `browser.layout.mjs`, `browser.viewport.mjs` |
 | Notes, typed relations and premises | [Exploration](#exploration-semantics-and-markdown-authority), [file contract](docs/notebook.md#file-contract); `notes.py`, `note_ops.py` | `test_notes.py`, `test_note_ops.py`, `browser.notes.mjs` |
 | MCP, proposals and recovery | [Review](#reviewed-proposals-in-the-graph-page-41), [MCP protocol](MCP.md#7-ordered-apply-and-recovery); `mcp_surface.py`, `proposals.py`, `writes.py`, `review.py` | `test_mcp_surface.py`, `test_proposals.py`, `test_proposal_apply.py`, `test_review.py`, `test_review_cleanup.py`, `test_writes.py`, `browser.proposals.mjs` |
 | Model or Git boundary | [Copilot](#copilot-boundary), [Git](#git-boundary); `llm.py`, `copilot.py`, `translate.py`, `gitinfo.py` | `test_llm_stream.py`, `test_standalone.py`, `test_gitinfo.py` |
@@ -348,7 +348,13 @@ the graph API's stable ID, file hash, state and abstracts; no index or embedding
 in this implementation. The ten original notes were summarized without rewriting their bodies.
 
 The UI uses a separate notebook section, distinct note nodes, line patterns, endpoints,
-edge labels and a legend. A selected-node local graph has explicit depth 1-3; hover highlights
+edge labels and a legend. A selected-node local graph has explicit depth 1-3 and upstream,
+downstream or both directions (default: both). Dependency, `assumes`, `supports` and `option`
+edges follow their stored source/target; upstream walks against arrows and downstream along
+them. Both merges independently visited upstream/downstream searches, never switching
+direction at a shared prerequisite or successor. `relates` is undirected in either search.
+Relation filters exclude edges before traversal; missing relations are skipped. Required
+containment ancestors remain visible without becoming traversal steps. Hover highlights
 connections, and backlinks navigate to the source note without promoting relations into
 dependencies. Projection aggregation includes relation type, so collapse cannot merge unlike
 meanings. Hidden/missing nodes never silently release an execution blocker.
