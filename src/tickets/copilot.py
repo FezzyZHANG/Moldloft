@@ -70,8 +70,9 @@ def context_for(graph, selected_id=None, references=None, selected_note=None):
         note = next((n for n in graph.get("notes", []) if n["id"] == selected_note), None)
         if note is None:
             raise DomainError("Selected note does not exist")
-        seeds.update(int(r["target"][7:]) for r in note["relations"]
-                     if r["target"].startswith("ticket:") and int(r["target"][7:]) in by_id)
+        if note["kind"] != "metadata":
+            seeds.update(int(r["target"][7:]) for r in note["relations"]
+                         if r["target"].startswith("ticket:") and int(r["target"][7:]) in by_id)
     if selected_id is not None:
         seeds.add(selected_id)
     if any(type(i) is not int or i not in by_id for i in seeds):
@@ -106,7 +107,8 @@ def context_for(graph, selected_id=None, references=None, selected_note=None):
         note_ids.update(by_id[i].get("assumptions", []))
     context["notes"] = [{**{k: n[k] for k in ("id", "title", "kind", "state", "body", "relations")},
                          **{k: n.get(k, "") for k in ("abstract_zh", "abstract_en")}}
-                        for n in graph.get("notes", []) if n["id"] in note_ids]
+                        for n in graph.get("notes", []) if n["id"] in note_ids
+                        and (n["kind"] != "metadata" or n["id"] == selected_note)]
     if len(context["notes"]) > 20:
         raise DomainError("Context exceeds 20 notes; select a smaller task")
     if len(json.dumps(context, ensure_ascii=False)) > 64000:

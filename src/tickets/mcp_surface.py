@@ -8,6 +8,7 @@ import re
 
 from . import basis as versions
 from .proposals import Proposals, coherent_graph
+from .notes import KINDS
 from .service import DomainError
 
 MAX_RESULT = 60000
@@ -84,7 +85,7 @@ class ReadTools:
         self.limit(limit)
         if not isinstance(query, str) or not query.strip() or len(query) > 200:
             raise DomainError('Search query must contain 1-200 characters')
-        if kind not in (None, 'ticket', 'assumption', 'question', 'idea', 'evidence', 'decision'):
+        if kind not in (None, 'ticket', *KINDS):
             raise DomainError('Invalid search kind')
         graph, items = self.graph(), []
         query = query.casefold().strip()
@@ -127,6 +128,8 @@ class ReadTools:
                 items.append({'band': 'direct' if direct else 'inherited', 'linked': True, 'note': note})
         candidate_count = 0
         for note in graph['notes']:
+            if note['kind'] == 'metadata':
+                continue
             haystack = ' '.join(note.get(f, '') for f in ('title', 'abstract_en', 'abstract_zh')).casefold()
             if note['id'] not in linked and note['id'] not in ticket['assumptions'] and any(term in haystack for term in terms):
                 legal = {'assumption': ['assumes', 'relates'], 'evidence': ['supports', 'relates'],
@@ -180,12 +183,12 @@ def create_mcp(store_getter, drydock_lister):
 
     @mcp.tool()
     async def get_note(note_id: str, drydock_id: str = 'default') -> dict:
-        """Call to inspect a premise, question, evidence or decision with its authored state and content hash."""
+        """Call to read an authored note and hash. Metadata indexes require explicit reads; their navigation does not expand context."""
         return await read('get_note', drydock_id, note_id)
 
     @mcp.tool()
     async def search(query: str, kind: str | None = None, limit: int = 50, drydock_id: str = 'default') -> dict:
-        """Call before creating work to find existing tickets or bilingual note abstracts. Search uses global guards."""
+        """Call to find existing tickets or bilingual note abstracts, including kind='metadata' indexes. Search uses global guards."""
         return await read('search', drydock_id, query, kind, limit)
 
     @mcp.tool()

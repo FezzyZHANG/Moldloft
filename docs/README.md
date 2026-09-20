@@ -45,6 +45,7 @@ index does not require loading every linked document or any user's working noteb
 | [MLD-DEC-004](decisions/004-self-contained-development-contract.md) | Keep development guidance self-contained and communication adaptable. |
 | [MLD-DEC-005](decisions/005-portable-sanity-bootstrap.md) | Migrate the offline sanity lifecycle with local, repeatable bootstrap and bounded temporary state. |
 | [MLD-DEC-006](decisions/006-containing-project-installation.md) | Install into an explicit containing project with optional shared principles and scoped hooks. |
+| [MLD-DEC-007](decisions/007-metadata-outside-the-graph.md) | Keep metadata navigation outside dependency graphs and automatic context expansion. |
 
 ## Decision template
 

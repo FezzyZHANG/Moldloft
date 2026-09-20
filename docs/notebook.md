@@ -73,6 +73,7 @@ synchronization adapter; tools rewriting frontmatter must preserve this subset.
 | idea | open, selected, parked |
 | evidence | recorded, superseded |
 | decision | proposed, accepted, superseded |
+| metadata | recorded |
 
 Use stable `ticket:22` or `note:n-example` targets. A note owns its outgoing relation
 metadata. Missing targets remain visible after removal of a target; browser/API writes
@@ -96,6 +97,33 @@ the API returns the assumption to `proposed` unless the request explicitly adopt
 text. An external edit with a stale/missing digest is displayed as proposed without rewriting
 the file. Review and adopt it in the Web editor to bind the new text; hand-editing the state
 alone is insufficient. Relations may change without changing the premise's meaning.
+
+## Metadata
+
+Each Drydock can have multiple `metadata` notes for overviews, reading guides and indexes.
+They use the same Markdown format, stable IDs, bilingual abstracts and versioned saves as
+other notes. The web navigator lists them under **Drydock 说明**, separately from ordinary
+notes. Create one there or change an existing index to `metadata` / `recorded` in the editor.
+An empty Drydock has the section but no automatically generated note or placeholder text.
+
+Metadata owns only `relates` references. All references with a metadata endpoint are
+navigation only, including incoming typed references from ordinary notes. The inspector
+retains them as **说明导航**, with missing targets visible, but graph nodes, edges, local
+traversal and premise propagation exclude them. The graph API retains all authored notes
+in `notes`; derived `relations` contains graph links and `metadata_relations` contains these
+navigation references. Selecting metadata opens the editor with the global graph visible.
+
+Copilot and MCP do not automatically attach metadata or follow its index references.
+Explicit selection / `get_note` reads the metadata itself; users can separately attach or
+read a referenced item. Search supports `kind="metadata"`. Notebook fingerprints and
+proposal structural guards still include metadata; it uses normal conflicts, review and
+recovery, with no additional store.
+
+Changing kind preserves the note's ID, text, abstracts and references. Review/remove any
+incompatible typed outgoing relations before converting a premise, evidence or idea.
+No automatic title-based conversion or rewrite occurs. Upgrade all writers before saving
+this kind: older applications report metadata files as unsupported. See
+[MLD-DEC-007](decisions/007-metadata-outside-the-graph.md) for the boundary and rationale.
 
 ## Editing and recovery
 

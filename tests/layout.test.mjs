@@ -4,7 +4,7 @@ import {fixtures, observations} from './layout-fixtures.mjs';
 import {wrapText} from '../src/tickets/static/text-layout.js';
 import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
-import {project, groupKey, neighborhood} from '../src/tickets/static/layout.js';
+import {project, groupKey, neighborhood, previewOverlay} from '../src/tickets/static/layout.js';
 const require = createRequire(import.meta.url);
 const ELK = require('../src/tickets/static/vendor/elk/elk-api.js');
 const {Worker} = require('../src/tickets/static/vendor/elk/elk-worker.min.js');
@@ -151,6 +151,32 @@ test('directional projection retains containment without traversing siblings', (
   assert.deepEqual(ids({direction: 'upstream'}), [1, 2, 3, 4, 5], 'global projection ignores local direction');
   const collapsed = project(graph, new Set(['t:1']), {focus: 't:2', depth: 3, direction: 'upstream'});
   assert.deepEqual(collapsed.edges.map(e => [e.sources[0], e.targets[0]]), [['t:4', 't:1']]);
+});
+
+test('metadata indexes never become nodes or traversal bridges, including proposal previews', () => {
+  const graph = {tickets: [ticket(1), ticket(2), ticket(3)], edges: [{blocker_id: 1, blocked_id: 2}],
+    notes: [{id: 'n-index', kind: 'metadata', title: 'Index'}, {id: 'n-a', kind: 'question', title: 'A'},
+      {id: 'n-b', kind: 'question', title: 'B'}], relations: [
+      ...['ticket:1', 'ticket:3', 'note:n-a', 'note:n-b'].map(target => ({source: 'note:n-index', target, type: 'relates'})),
+      {source: 'note:n-b', target: 'note:n-index', type: 'assumes'},
+      {source: 'note:n-a', target: 'ticket:1', type: 'relates'},
+    ]};
+  const before = structuredClone(graph);
+  for (const direction of ['both', 'upstream', 'downstream']) {
+    const local = [...neighborhood(graph, 't:1', 3, null, direction)].sort();
+    assert.deepEqual(local, direction === 'upstream' ? ['n:n-a', 't:1'] : ['n:n-a', 't:1', 't:2']);
+    assert.deepEqual([...neighborhood(graph, 'n:n-index', 3, null, direction)], []);
+    assert.deepEqual([...neighborhood(graph, 'n:n-b', 3, null, direction)], ['n:n-b']);
+  }
+  for (const collapsed of [new Set(), new Set([groupKey('Fixture')])]) {
+    const projected = project(graph, collapsed);
+    assert.deepEqual(flatten(projected).filter(n => n.data?.note).map(n => n.data.note.id).sort(), ['n-a', 'n-b']);
+    assert.ok(projected.edges.every(e => ![...e.sources, ...e.targets].includes('n:n-index')));
+  }
+  assert.equal(project(graph, new Set(), {search: 'Index'}).children.length, 0);
+  const overlay = previewOverlay(graph, {preview: graph, changes: [{kind: 'note', note_id: 'n-index'}]});
+  assert.ok(!flatten(project(overlay)).some(n => n.data?.note?.kind === 'metadata'));
+  assert.deepEqual(graph, before, 'projection preserves authored navigation references');
 });
 
 test('ELK handles parent endpoints in either dependency direction', async () => {

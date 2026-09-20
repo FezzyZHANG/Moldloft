@@ -1,5 +1,5 @@
 // Projection is presentation only. Dependency validation always uses the full graph.
-import {matchesNote, referenceKey, relationLabels} from './notes-data.js';
+import {isMetadata, matchesNote, referenceKey, relationLabels} from './notes-data.js';
 export const ticketKey = id => `t:${id}`;
 export const groupKey = name => `g:${name}`;
 export const noteKey = id => `n:${id}`;
@@ -7,10 +7,12 @@ export const noteKey = id => `n:${id}`;
 const ticketRefId = ref => ref.startsWith('ticket:new:') ? ref.slice(7) : Number(ref.slice(7));
 
 export function neighborhood(graph, key, depth = 1, types = null, direction = 'both') {
+  const metadata = new Set((graph.notes || []).filter(isMetadata).map(n => noteKey(n.id)));
+  if (metadata.has(key)) return new Set();
   const pairs = [
     ...(types && !types.has('requires') ? [] : graph.edges.map(e => [ticketKey(e.blocker_id), ticketKey(e.blocked_id)])),
     ...(graph.relations || []).filter(r => !r.missing && (!types || types.has(r.type))).map(r => [referenceKey(r.source), referenceKey(r.target), r.type === 'relates']),
-  ];
+  ].filter(([source, target]) => !metadata.has(source) && !metadata.has(target));
   function traverse(upstream) {
     const found = new Set([key]); let frontier = new Set([key]);
     for (let i = 0; i < Math.min(3, Math.max(1, depth)); i++) {
@@ -89,6 +91,7 @@ export function project(graph, collapsed = new Set(), filter = {}) {
     aggregate.get(key).data.edges.push(edge);
   }
   const notes = filter.showNotes === false ? [] : (graph.notes || []).filter(n => {
+    if (isMetadata(n)) return false;
     if (local && !local.has(noteKey(n.id))) return false;
     if (filter.search && !matchesNote(n, filter.search)) return false;
     if (filter.group !== undefined || filter.status) {

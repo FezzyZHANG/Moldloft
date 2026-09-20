@@ -22,6 +22,7 @@ KINDS = {
     "idea": ("open", "selected", "parked"),
     "evidence": ("recorded", "superseded"),
     "decision": ("proposed", "accepted", "superseded"),
+    "metadata": ("recorded",),
 }
 RELATIONS = {"assumes", "supports", "relates", "option"}
 ABSTRACT_LIMITS = {"abstract_zh": 600, "abstract_en": 1200}
@@ -229,11 +230,15 @@ class Notebook:
         known = {f"ticket:{t['id']}" for t in graph["tickets"]} | {f"note:{n['id']}" for n in graph["notes"]}
         relations = [{**r, "source": f"note:{n['id']}", "owner": n["id"], "missing": r["target"] not in known}
                      for n in graph["notes"] for r in n["relations"]]
-        graph["relations"] = relations
+        metadata = {f"note:{n['id']}" for n in graph["notes"] if n["kind"] == "metadata"}
+        # Metadata references are navigation, including links pointing into an index.
+        # Retain them for inspection without letting an index become a graph hub.
+        graph["metadata_relations"] = [r for r in relations if r["source"] in metadata or r["target"] in metadata]
+        graph["relations"] = [r for r in relations if r["source"] not in metadata and r["target"] not in metadata]
         adjacency = {key: [] for key in known}
         for edge in graph["edges"]:
             adjacency[f"ticket:{edge['blocker_id']}"].append(f"ticket:{edge['blocked_id']}")
-        for relation in relations:
+        for relation in graph["relations"]:
             if relation["type"] == "assumes" and not relation["missing"]:
                 adjacency[relation["source"]].append(relation["target"])
         premises = {key: [] for key in known}

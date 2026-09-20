@@ -204,6 +204,16 @@ Missing abstracts remain visible without blocking an initial idea capture. Revie
 when the body or judgment changes; they are retrieval cues and do not certify a premise.
 See the [abstract contract](docs/notebook.md#bilingual-abstracts) for limits and future indexing.
 
+Each Drydock has a separate **Drydock 说明** list for any number of **Metadata** overviews
+and indexes. Create one with that section's **新建**, or change an existing index's type to
+**Metadata / 图谱说明**. Text, abstracts, IDs and navigation references stay intact; remove
+incompatible typed outgoing relations before converting. Metadata and every link touching
+it stay outside global/local graph traversal and premise propagation, preventing indexes
+from becoming graph hubs. The inspector keeps those links as **说明导航**. Copilot/MCP read
+metadata only on explicit selection/read and do not follow its references automatically.
+Existing notebooks are not rewritten; upgrade all writers before conversion. See the
+[metadata contract](docs/notebook.md#metadata).
+
 Execution prerequisites are solid arrows; assumed premises use dashed open arrows; evidence
 uses heavier solid arrows; related context uses dotted lines without an arrow; candidate
 options use dash-dot lines with diamond endpoints. Labels and a filterable legend supplement
@@ -497,6 +507,10 @@ rerunning the smoke script. Screenshots go to the OS temporary directory.
 Run `node tests/browser.notes.mjs` against the fixture server to exercise note
 saving/IME/conflicts, bilingual abstract lookup, typed links, backlinks, local graph and
 separate note creation. Restart the fixture before each browser script.
+
+`node tests/browser.metadata.mjs` checks separate metadata listing, navigation without
+graph nodes, explicit creation, versioned conversion and conflicts, search, narrow layout
+and isolation across Drydock switches.
 
 `node tests/browser.local.mjs` checks upstream/downstream/both local traversal for tickets
 and notes, fork/join exclusion, depth and relation filters, selected context and narrow

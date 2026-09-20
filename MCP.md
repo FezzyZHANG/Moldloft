@@ -54,6 +54,14 @@ Names can change, IDs cannot. The UI owns graph creation/renaming; MCP has no su
 | `get_proposal(proposal_id, rationale_offset=0, rationale_limit=8000)` | Read the stored outcome, original basis, reviewer reason/note/amendments and paged rationale. Rationale page limit 1-16000. A cleared record reports its retained outcome with no rationale. |
 | `propose_changes(...)` | Queue one pending ticket, note or mixed proposal, returning `proposal_id` and status. Requires the captured read basis and a stable retry ID. |
 
+Metadata overviews/indexes use `kind="metadata"`, `state="recorded"`. Discover them with
+`search(query, kind="metadata")` and read each explicitly with `get_note`; its basis contains
+that note without expanding navigation references. Metadata and incoming links to it are
+excluded from automatic ticket/note dependency expansion, premise mapping and lexical
+premise candidates. They remain part of the notebook fingerprint and structural guard,
+and creation/conversion still uses reviewed note proposals. See the
+[metadata contract](docs/notebook.md#metadata).
+
 Graph reads and proposal results identify their `drydock_id`. Graph read results have a
 60,000-character content budget (JSON framing adds small overhead).
 `items`, `total_items`, `complete` and `truncated` describe the requested result. Never infer

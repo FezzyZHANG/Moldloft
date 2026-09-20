@@ -18,7 +18,7 @@ paths are under `tests/`. Run commands from the repository root as described in
 | Ticket schema, dependencies and retries | [Transactions](#schema-and-transactions); `db.py`, `models.py`, `service.py` | `test_graph.py`, `test_writes.py` |
 | Save, conflict and live refresh | [Editor contract](#attention-based-saving-and-live-refresh); `static/draft.js`, `static/graph.js` | `draft.test.mjs`, `browser.smoke.mjs`, `browser.viewport.mjs` |
 | Layout, selection and grouping | [Rendering](#rendering-and-grouping); `static/layout*.js`, `static/layouts/` | `layout.test.mjs`, `browser.local.mjs`, `browser.layout.mjs`, `browser.viewport.mjs` |
-| Notes, typed relations and premises | [Exploration](#exploration-semantics-and-markdown-authority), [file contract](docs/notebook.md#file-contract); `notes.py`, `note_ops.py` | `test_notes.py`, `test_note_ops.py`, `browser.notes.mjs` |
+| Notes, typed relations, metadata and premises | [Exploration](#exploration-semantics-and-markdown-authority), [file contract](docs/notebook.md#file-contract); `notes.py`, `note_ops.py` | `test_notes.py`, `test_metadata.py`, `test_note_ops.py`, `browser.notes.mjs`, `browser.metadata.mjs` |
 | MCP, proposals and recovery | [Review](#reviewed-proposals-in-the-graph-page-41), [MCP protocol](MCP.md#7-ordered-apply-and-recovery); `mcp_surface.py`, `proposals.py`, `writes.py`, `review.py` | `test_mcp_surface.py`, `test_proposals.py`, `test_proposal_apply.py`, `test_review.py`, `test_review_cleanup.py`, `test_writes.py`, `browser.proposals.mjs` |
 | Model or Git boundary | [Copilot](#copilot-boundary), [Git](#git-boundary); `llm.py`, `copilot.py`, `translate.py`, `gitinfo.py` | `test_llm_stream.py`, `test_standalone.py`, `test_gitinfo.py` |
 | Configuration, launch or packaging | [Source ownership](#existing-single-graph-semantics), [distribution checks](README.md#build-and-verify-the-distribution); `config.py`, `__main__.py`, `server.py`, root manifests | `test_standalone.py`, `test_shutdown.py`; installed-wheel checks |
@@ -323,6 +323,18 @@ stable `n-...` IDs. A note owns outgoing `assumes`, `supports`, `relates` or `op
 metadata. Only an assumption supplies `assumes`, evidence supplies `supports`, and an
 idea supplies `option`. These links are not added to `TicketEdge` and may contain cycles.
 Parent containment remains separate from both relations and completion.
+
+Each Drydock also supports multiple `metadata` / `recorded` notes for its overview and
+indexes. They share the Markdown writer and ordinary note identity/version/recovery, but
+all incident references are navigation only. `Notebook.decorate` partitions those into
+`metadata_relations`, leaving graph `relations` and premise propagation free of metadata.
+Projection excludes the notes and their references, including incoming links; the web
+navigator lists them separately and the inspector retains navigation. Bounded MCP read
+dependencies and automatic Copilot attachments do not expand through metadata. Explicit
+selection reads just that note; its text is not injected globally. Structural validation
+still includes every note kind and relation. Creation/conversion is explicit, never an
+automatic notebook migration. See the [metadata contract](docs/notebook.md#metadata) and
+[MLD-DEC-007](docs/decisions/007-metadata-outside-the-graph.md).
 
 `assumes` points from the premise to the work adopting it. Premise identity propagates
 through `assumes` links and the execution DAG using a visited set. A changed/refuted

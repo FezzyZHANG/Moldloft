@@ -5,6 +5,11 @@ in [MLD-DEC-002](docs/decisions/002-standalone-source-extraction.md).
 
 ## [Unreleased]
 
+- Add multiple metadata notes per Drydock, with a separate web list and ordinary versioned
+  editing. Preserve overview/index navigation while excluding metadata and its incident
+  links from graph projection, premise propagation and automatic Copilot/MCP context.
+  Existing notes can be converted explicitly without changing IDs, prose or references.
+
 - Local graph now offers upstream, downstream and both directions. Both follows each
   direction separately, avoiding unrelated branches through shared neighbors; undirected
   context links remain available in either direction.

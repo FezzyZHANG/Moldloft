@@ -71,6 +71,33 @@ class DrydockTests(unittest.TestCase):
         with DrydockRestart(self.database, self.notebook) as restarted:
             self.assertEqual(restarted.get(dock).store.graph(), research)
 
+    def test_metadata_ids_versions_and_navigation_stay_in_their_own_drydock(self):
+        dock = self.create()
+        for ident in ('default', dock):
+            self.ticket(ident, ident)
+            response = self.client.put('/api/notes/n-index', params={'drydock': ident}, json={
+                'fields': {'title': ident, 'kind': 'metadata', 'state': 'recorded',
+                           'body': f'Overview for {ident}', 'relations': [{'type': 'relates', 'target': 'ticket:1'}]}})
+            self.assertEqual(response.status_code, 200, response.text)
+        original = self.client.get('/api/graph').json()
+        other = self.client.get('/api/graph', params={'drydock': dock}).json()
+        self.assertEqual(original['notes'][0]['id'], other['notes'][0]['id'])
+        self.assertNotEqual(original['notes'][0]['version'], other['notes'][0]['version'])
+        self.assertEqual(other['relations'], [])
+        self.assertEqual(other['metadata_relations'][0]['target'], 'ticket:1')
+        captured = basis.capture(original, note_ids=['n-index'])
+        operations = [{'op': 'note_update', 'note_id': 'n-index', 'fields': {'body': 'Wrong scope'}}]
+        with self.assertRaisesRegex(DomainError, 'another Drydock'):
+            basis.check(captured, other, operations)
+        note = other['notes'][0]
+        response = self.client.put('/api/notes/n-index', params={'drydock': dock}, json={
+            'fields': {'body': 'Changed only here'}, 'version': note['version']})
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(self.client.get('/api/graph').json(), original)
+        with DrydockRestart(self.database, self.notebook) as restarted:
+            self.assertEqual(restarted.get(dock).notes.read('n-index')['body'], 'Changed only here')
+            self.assertEqual(restarted.get().store.graph(), original)
+
     def test_catalog_create_retries_concurrency_rename_and_name_validation(self):
         request_id = str(uuid.uuid4())
         with ThreadPoolExecutor(max_workers=3) as workers:

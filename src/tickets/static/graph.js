@@ -2,7 +2,7 @@ import {TicketDraft, AttentionSaver, fields} from './draft.js';
 import {Diagram, statuses, priorities} from './canvas.js';
 import {groupKey, previewOverlay, ticketKey, noteKey} from './layout.js';
 import {NotesEditor} from './notes-editor.js';
-import {matchesNote, noteKinds, notePreview, noteStates, relationNames} from './notes-data.js';
+import {isMetadata, matchesNote, noteKinds, notePreview, noteStates, relationNames} from './notes-data.js';
 import {scopedUrl, setupDrydocks} from './drydocks.js';
 
 const $ = id => document.getElementById(id);
@@ -76,9 +76,11 @@ function scheduleDraw() { clearTimeout(drawTimer); drawTimer = setTimeout(draw, 
 function draw() {
   const overlay = review?.preview ? previewOverlay(reviewBase, review.preview) : proposal && !proposalStale() ? previewOverlay(previewBase, proposal) : null;
   const displayed = overlay || graph;
-  $('graph-count').textContent = `${graph.tickets.length} 工单 · ${(graph.notes || []).length} 笔记`;
+  $('graph-count').textContent = `${graph.tickets.length} 工单 · ${(graph.notes || []).filter(n => !isMetadata(n)).length} 笔记`;
   $('graph-hint').textContent = connecting ? `选择后续工单：#${connecting} → …（Esc 取消）` : overlay ? '正在预览提案；应用后才会保存' : '实线箭头指向后续工单 · 悬停查看邻居 · 点击连线查看关系';
-  const focus = notes.id ? noteKey(notes.id) : selected ? ticketKey(selected) : null;
+  const metadataSelected = isMetadata(notes.isNew ? notes.draft.values : (graph.notes || []).find(n => n.id === notes.id));
+  if (metadataSelected) localGraph = false;
+  const focus = metadataSelected ? null : notes.id ? noteKey(notes.id) : selected ? ticketKey(selected) : null;
   $('local-graph').disabled = !focus;
   $('local-graph').setAttribute('aria-pressed', String(localGraph));
   const direction = $('local-direction');
@@ -152,18 +154,20 @@ function renderTree() {
     append(null, 0); root.append(section);
   }
   $('group-list').replaceChildren(...groups.map(g => { const o = node('option'); o.value = g; return o; }));
-  const list = $('notes-tree'); list.replaceChildren();
+  const list = $('notes-tree'), metadata = $('metadata-tree'); list.replaceChildren(); metadata.replaceChildren();
   for (const kind of Object.keys(noteKinds)) {
     const items = (graph.notes || []).filter(n => n.kind === kind && matchesNote(n, $('search').value));
     if (!items.length) continue;
-    list.append(node('h3', `${noteKinds[kind]} · ${items.length}`));
+    const target = kind === 'metadata' ? metadata : list;
+    if (kind !== 'metadata') target.append(node('h3', `${noteKinds[kind]} · ${items.length}`));
     for (const n of items) {
       const entry = button('', () => runAction(() => selectNote(n.id)), `tree-note ${notes.id === n.id ? 'selected' : ''}`);
       entry.append(node('span', `◇ ${n.title}`, 'note-title'), node('small', n.abstract_zh || n.abstract_en || '摘要待补充', 'note-snippet'));
-      entry.title = `${n.title}\n${noteStates[n.kind][n.state]}\n${notePreview(n)}`; list.append(entry);
+      entry.title = `${n.title}\n${noteStates[n.kind][n.state]}\n${notePreview(n)}`; target.append(entry);
     }
   }
   if (!list.childNodes.length) list.append(node('small', $('search').value.trim() ? '没有匹配的笔记。' : '把尚未成为任务的想法放在这里。'));
+  if (!metadata.childNodes.length) metadata.append(node('small', $('search').value.trim() ? '没有匹配的说明。' : '可新建说明，或将已有总览的类型改为 Metadata。'));
   $('notes-warning').hidden = !(graph.notes_errors || []).length;
   $('notes-warning').textContent = (graph.notes_errors || []).map(e => `${e.file}: ${e.message}`).join('\n');
 }
@@ -214,14 +218,15 @@ function selectNote(id) {
   const note = graph.notes.find(n => n.id === id);
   if (!note) throw new Error('笔记不存在或暂时无法读取');
   leaveReview(); selected = null; isNew = false; draft.load(null); notes.show(note);
-  renderTree(); renderKnowledge(); renderContext(); diagram.select(id); historyReplace(null, id); draw();
+  renderTree(); renderKnowledge(); renderContext(); diagram.select(isMetadata(note) ? null : id); historyReplace(null, id); draw();
 }
 function openReference(ref) {
   if (!ref) { $('editor-heading').textContent = '工单与笔记'; $('save-state').textContent = ''; renderForm(); renderKnowledge(); renderTree(); renderContext(); historyReplace(null); return; }
   return ref.startsWith('ticket:') ? selectTicket(Number(ref.slice(7))) : selectNote(ref.slice(5));
 }
-function startNote(target = null) {
-  connecting = null; leaveReview(); selected = null; isNew = false; draft.load(null); notes.start(target);
+function startNote(target = null, kind = 'question') {
+  connecting = null; leaveReview(); selected = null; isNew = false; draft.load(null); notes.start(target, kind);
+  if (kind === 'metadata') { localGraph = false; draw(); }
   renderKnowledge(); renderTree(); renderContext(); diagram.select(null); historyReplace(null);
 }
 function startNew(parent = null) {
@@ -447,7 +452,7 @@ function renderKnowledge() {
   const ticket = graph.tickets.find(t => t.id === selected);
   $('premise-warning').hidden = !ticket?.assumptions?.length;
   $('premise-warning').textContent = ticket?.review_notes?.length ? '有未验证、已否定或已撤回的前提；请复核当前方案。工单状态保持不变。' : '当前方案依赖已明确采纳的假设。';
-  const references = (graph.relations || []).filter(r => r.source === ref || r.target === ref);
+  const references = [...(graph.relations || []), ...(graph.metadata_relations || [])].filter(r => r.source === ref || r.target === ref);
   for (const premise of ticket?.assumptions || []) {
     if (!references.some(r => r.source === `note:${premise}` && r.type === 'assumes')) references.push({source: `note:${premise}`, target: ref, type: 'assumes', inherited: true});
   }
@@ -455,7 +460,8 @@ function renderKnowledge() {
     const other = relation.source === ref ? relation.target : relation.source;
     const value = other.startsWith('ticket:') ? graph.tickets.find(t => t.id === Number(other.slice(7))) : (graph.notes || []).find(n => n.id === other.slice(5));
     const row = node('div', '', `relation backlink relation-${relation.type}`);
-    row.append(node('span', '', 'line-swatch'), node('span', `${relationNames[relation.type]}${relation.inherited ? ' · 经由前置工单' : ''} · ${value?.title || other + '（目标缺失）'}`, 'label'));
+    const navigation = isMetadata(value) || isMetadata(graph.notes.find(n => `note:${n.id}` === ref));
+    row.append(node('span', '', 'line-swatch'), node('span', `${navigation ? '说明导航' : relationNames[relation.type]}${relation.inherited ? ' · 经由前置工单' : ''} · ${value?.title || other + '（目标缺失）'}`, 'label'));
     if (value) { const open = button('打开', () => runAction(() => openReference(other))); open.title = other.startsWith('note:') ? notePreview(value) : value.description?.slice(0, 320) || ''; row.append(open); }
     list.append(row);
   }
@@ -516,6 +522,7 @@ window.addEventListener('keydown', event => {
 
 $('new-ticket').onclick = () => runAction(() => startNew());
 $('new-note').onclick = () => runAction(() => startNote());
+$('new-metadata').onclick = () => runAction(() => startNote(null, 'metadata'));
 $('capture-note').onclick = () => runAction(() => startNote(notes.id ? `note:${notes.id}` : `ticket:${selected}`));
 $('new-child').onclick = () => runAction(() => startNew(selected));
 $('connect-node').onclick = () => runAction(() => { connecting = selected; draw(); });
@@ -583,7 +590,7 @@ function renderContext() {
   const seeds = new Set(references()); if (selected) seeds.add(selected);
   if (notes.id) {
     const active = (graph.notes || []).find(n => n.id === notes.id);
-    for (const r of active?.relations || []) if (r.target.startsWith('ticket:') && graph.tickets.some(t => t.id === Number(r.target.slice(7)))) seeds.add(Number(r.target.slice(7)));
+    for (const r of isMetadata(active) ? [] : active?.relations || []) if (r.target.startsWith('ticket:') && graph.tickets.some(t => t.id === Number(r.target.slice(7)))) seeds.add(Number(r.target.slice(7)));
   }
   const ids = new Set(seeds);
   for (const t of graph.tickets) {
@@ -595,7 +602,7 @@ function renderContext() {
   const attached = new Set((graph.relations || []).filter(r => [...ids].some(id => r.target === `ticket:${id}`)).map(r => r.owner));
   for (const t of graph.tickets) if (ids.has(t.id)) for (const id of t.assumptions || []) attached.add(id);
   if (notes.id && !notes.isNew) attached.add(notes.id);
-  for (const n of graph.notes || []) if (attached.has(n.id)) { const chip = node('span', `◇ ${n.title.slice(0, 24)}`); chip.title = n.title; $('chat-context').append(chip); }
+  for (const n of graph.notes || []) if (attached.has(n.id) && (!isMetadata(n) || n.id === notes.id)) { const chip = node('span', `◇ ${n.title.slice(0, 24)}`); chip.title = n.title; $('chat-context').append(chip); }
 }
 $('chat-input').oninput = renderContext;
 function message(role, content) {

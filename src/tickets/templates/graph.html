@@ -20,6 +20,9 @@
       <label>查找工单与笔记<input id="search" type="search" placeholder="编号、标题或双语摘要"></label>
       <label>状态<select id="status-filter"><option value="">全部状态</option value="open">待处理</option><option value="in_progress">处理中</option><option value="done">已完成</option><option value="closed">已关闭</option></select></label>
       <button class="ghost" id="clear-filter">所有工单组</button>
+      <div class="section-header notes-heading"><h2>Drydock 说明</h2><button id="new-metadata" class="ghost" aria-label="新建 Metadata 说明">＋ 新建</button></div>
+      <p class="muted">Metadata · 总览与索引，不进入依赖图</p>
+      <div id="metadata-tree"></div>
       <div id="tree"></div>
       <div class="section-header notes-heading"><h2>笔记</h2><button id="new-note" class="ghost">＋ 新建</button></div>
       <p class="muted">假设 · 问题 · 灵感 · 证据 · 决定</p>
@@ -64,6 +67,7 @@
           <label>标题<input name="title" maxlength="200" required></label>
           <div class="two-fields"><label>类型<select name="kind"></select></label><label>状态<select name="state"></select></label></div>
           <small id="note-adoption" class="muted" hidden>前提文字已改变，原采纳对应旧版本；请复核后重新采纳。</small>
+          <small id="note-metadata-hint" class="muted" hidden>图谱说明与索引单独列出；引用只用于导航，不参与依赖图或自动扩展 Copilot 上下文。</small>
           <div class="note-abstracts">
             <label>中文摘要<textarea name="abstract_zh" lang="zh-CN" rows="2" maxlength="600" aria-describedby="note-abstract-hint" placeholder="一段浓缩灵感，保留不确定性与关键 English terms。"></textarea></label>
             <label>English abstract<textarea name="abstract_en" lang="en" rows="2" maxlength="1200" aria-describedby="note-abstract-hint" placeholder="One compact paragraph: the idea, uncertainty, and what would move it forward."></textarea></label>

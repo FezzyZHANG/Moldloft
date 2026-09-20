@@ -23,6 +23,7 @@ def structure(graph):
 def dependencies(graph, ticket_ids=(), note_ids=()):
     tickets = {t['id']: t for t in graph['tickets']}
     notes = {n['id']: n for n in graph.get('notes', [])}
+    metadata = {f'note:{n["id"]}' for n in notes.values() if n['kind'] == 'metadata'}
     selected_tickets, selected_notes = set(ticket_ids), set(note_ids)
     if selected_tickets - tickets.keys() or selected_notes - notes.keys():
         raise DomainError('Read dependency no longer exists', 409)
@@ -37,10 +38,13 @@ def dependencies(graph, ticket_ids=(), note_ids=()):
                 selected_tickets.add(edge['blocker_id'])
         targets = {f'ticket:{t}' for t in selected_tickets} | {f'note:{n}' for n in selected_notes}
         for note in notes.values():
-            if any(r['target'] in targets for r in note['relations']):
+            if note['kind'] == 'metadata':
+                continue
+            relations = [r for r in note['relations'] if r['target'] not in metadata]
+            if any(r['target'] in targets for r in relations):
                 selected_notes.add(note['id'])
             if note['id'] in selected_notes:
-                for relation in note['relations']:
+                for relation in relations:
                     target = relation['target']
                     if target.startswith('ticket:') and int(target[7:]) in tickets:
                         selected_tickets.add(int(target[7:]))

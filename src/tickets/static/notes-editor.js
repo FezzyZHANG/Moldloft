@@ -1,5 +1,5 @@
 import {TicketDraft, AttentionSaver} from './draft.js';
-import {abstractFields, noteFields, noteKinds, noteStates, relationNames, relationTypes} from './notes-data.js';
+import {abstractFields, isMetadata, noteFields, noteKinds, noteStates, relationNames, relationTypes} from './notes-data.js';
 const $ = id => document.getElementById(id);
 
 export class NotesEditor {
@@ -30,7 +30,7 @@ export class NotesEditor {
         }
         this.draft.set(name, event.target.value);
         this.draft.set('state', Object.keys(noteStates[event.target.value])[0]);
-        this.renderOptions();
+        this.renderOptions(); this.renderRelations();
       } else this.draft.set(name, event.target.value);
     });
     this.form.onsubmit = event => { event.preventDefault(); this.saveNow().catch(report); };
@@ -41,6 +41,7 @@ export class NotesEditor {
       this.draft.set('relations', [...this.draft.values.relations, {type, target}]); this.renderRelations();
     };
     $('note-relation-type').onchange = () => this.renderRelationHelp();
+    $('note-relation-target').onchange = () => this.renderRelationHelp();
     $('note-use-server').onclick = async () => {
       try {
         await saved();
@@ -63,9 +64,9 @@ export class NotesEditor {
     return this.api(`/api/notes/${id}`, {method: 'PUT', body, keepalive: new Blob([body]).size < 60000});
   }
   show(note) { this.active = true; this.isNew = false; this.draft.load(note); this.render(); }
-  start(target) {
+  start(target, kind = 'question') {
     this.active = true; this.isNew = true;
-    this.draft.load({id: `n-${crypto.randomUUID()}`, title: '', kind: 'question', state: 'open', body: '', abstract_zh: '', abstract_en: '',
+    this.draft.load({id: `n-${crypto.randomUUID()}`, title: '', kind, state: Object.keys(noteStates[kind])[0], body: '', abstract_zh: '', abstract_en: '',
       relations: target ? [{type: 'relates', target}] : [], version: null});
     this.render(); this.form.elements.title.focus();
   }
@@ -128,17 +129,18 @@ export class NotesEditor {
   }
   renderOptions() {
     const {kind, state} = this.draft.values;
+    $('note-metadata-hint').hidden = kind !== 'metadata';
     const selectedType = $('note-relation-type').value, selectedTarget = $('note-relation-target').value;
     this.form.elements.state.replaceChildren(...Object.entries(noteStates[kind]).map(([id, title]) => new Option(title, id)));
     this.form.elements.state.value = state;
     $('note-relation-type').replaceChildren(...relationTypes(kind).map(type => new Option(relationNames[type], type)));
     if (relationTypes(kind).includes(selectedType)) $('note-relation-type').value = selectedType;
-    this.renderRelationHelp();
     const graph = this.graph();
     $('note-relation-target').replaceChildren(new Option('选择工单或笔记', ''),
       ...graph.tickets.map(t => new Option(`#${t.id} ${t.title.slice(0, 40)}`, `ticket:${t.id}`)),
       ...(graph.notes || []).filter(n => n.id !== this.id).map(n => new Option(`◇ ${n.title}`, `note:${n.id}`)));
     if ([...$('note-relation-target').options].some(o => o.value === selectedTarget)) $('note-relation-target').value = selectedTarget;
+    this.renderRelationHelp();
   }
   renderRelations() {
     $('note-relations').replaceChildren();
@@ -147,14 +149,17 @@ export class NotesEditor {
       const label = document.createElement('span'); label.className = 'label';
       const graph = this.graph();
       const target = relation.target.startsWith('ticket:') ? graph.tickets.find(t => t.id === Number(relation.target.slice(7))) : graph.notes.find(n => n.id === relation.target.slice(5));
-      label.textContent = `${relationNames[relation.type]} ${relation.type === 'relates' ? '—' : '→'} ${target?.title || relation.target + '（目标缺失）'}`;
+      const navigation = isMetadata(this.draft.values) || isMetadata(target);
+      label.textContent = `${navigation ? '说明导航' : relationNames[relation.type]} ${relation.type === 'relates' ? '—' : '→'} ${target?.title || relation.target + '（目标缺失）'}`;
       const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'ghost'; remove.textContent = '移除';
       remove.onclick = () => { this.draft.set('relations', this.draft.values.relations.filter((_, i) => i !== index)); this.renderRelations(); };
       row.append(label, remove); $('note-relations').append(row);
     }
   }
   renderRelationHelp() {
-    $('note-relation-help').textContent = {relates: '上下文关联，不要求先后顺序。', assumes: '箭头指向采用此假设的工单或笔记；前提变化时提示复核。',
+    const target = this.graph().notes.find(n => `note:${n.id}` === $('note-relation-target').value);
+    $('note-relation-help').textContent = isMetadata(this.draft.values) || isMetadata(target) ? '仅用于说明导航，不进入图谱或前提追溯。' :
+      {relates: '上下文关联，不要求先后顺序。', assumes: '箭头指向采用此假设的工单或笔记；前提变化时提示复核。',
       supports: '此证据支持目标判断；关联本身不代表判断已成立。', option: '此想法是目标的候选方案，不会成为执行阻塞。'}[$('note-relation-type').value];
   }
   render() {
