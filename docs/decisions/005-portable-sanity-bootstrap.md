@@ -57,6 +57,7 @@ confirmation or maintenance schedule. Reinstall only when paths/definitions chan
 |---|---|
 | Pending challenges in OS temporary storage | Opaque checkout/host/session/agent scope; removed on completion or bounded failure and expired after two hours on access. Not tracked or backed up; losing one yields no pending check, not a pass. |
 | Metadata-only audit SQLite in the same temporary root | Two-hour pruning on access; no raw payload, message or answer. Hashes/IDs and outcomes diagnose execution, without a durable-history claim. Audit failure never changes the one-retry policy. |
+| Cadence metadata under the same temporary root | Per-scope turn count, last question ID, hashed last turn and update time only; expires after two idle hours on access. No prompts or answers. Loss resets scheduling/rotation, not grading outcomes; no backup required. |
 | Ignored local hook settings | Owned handlers are reproducible from the tracked bootstrap and chosen local interpreter. Unrelated merged settings are private operator configuration with no new backup guarantee. Source clones and archives contain the generator, not local settings. |
 
 These are explicit exceptions for disposable operational evidence and private local tool
@@ -65,6 +66,16 @@ secure-erasure guarantee or root/subagent model inference is introduced. The app
 continues to operate without hooks, and hooks need no application installation.
 
 ## Evidence and review
+
+2026-09-23: The owner requested periodic long-conversation checks as well as compaction
+checks. Codex now samples every five subsequent user turns using `UserPromptSubmit` and
+uses the existing `SessionStart` path after compaction. A passed receipt retires only that
+challenge. Question rotation and minimal cadence state prevent repeated startup selection
+from becoming a memorized fixed answer. This samples instruction uptake at checkpoints;
+it does not prove general attention quality or unaided recall. A separate metadata file
+keeps scheduling independent of audit availability and expected-answer state. Synthetic
+fixtures verify cadence, retries, expiry and generated launchers; live delivery remains
+host evidence, not a consequence of those fixtures.
 
 Isolated regressions cover lifecycle grading, bounded repair, stale receipt rejection,
 scope separation, Unicode, audit failures/retention/concurrency, idempotent installation,

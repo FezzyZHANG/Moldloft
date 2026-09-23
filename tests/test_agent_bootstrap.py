@@ -128,7 +128,10 @@ class BootstrapTests(unittest.TestCase):
         for host in bootstrap.HOST_FILES:
             with self.subTest(host=host):
                 events = bootstrap.definitions(host, self.root)
-                self.assertEqual(set(events), {"SessionStart", "Stop"} if host == "zcode" else set(bootstrap.EVENTS))
+                expected = {"SessionStart", "Stop"} if host == "zcode" else set(bootstrap.EVENTS)
+                if host == "codex":
+                    expected.add("UserPromptSubmit")
+                self.assertEqual(set(events), expected)
                 for groups in events.values():
                     self.assertEqual(len(groups), 1)
                     command = groups[0]["hooks"][0]

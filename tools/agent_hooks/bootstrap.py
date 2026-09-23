@@ -68,10 +68,12 @@ def handler(host: str, root: Path = ROOT, interpreter: Path | str = sys.executab
 
 def definitions(host: str, root: Path = ROOT, interpreter: Path | str = sys.executable, **options) -> dict:
     events = ("SessionStart", "Stop") if host == "zcode" else EVENTS
+    if host == "codex":
+        events = (*events, "UserPromptSubmit")
     result = {}
     for event in events:
         command = handler(host, root, interpreter, **options)
-        if host == "codex" and event.endswith("Start"):
+        if host == "codex" and (event.endswith("Start") or event == "UserPromptSubmit"):
             command.update(statusMessage="Checking repository sanity", additionalContextLimit=2048)
         result[event] = [{"hooks": [command]}]
     return result
@@ -329,6 +331,16 @@ def self_test(host: str, root: Path = ROOT, interpreter: Path | str = sys.execut
                 assert invoke("SubagentStop", agent_id="fixture-child", last_assistant_message=child_receipt) is None
             assert invoke("Stop", last_assistant_message=root_receipt) is None
             assert invoke("Stop") is None
+            if host == "codex":
+                for index in range(1, sanity.CHECK_INTERVAL):
+                    assert invoke("UserPromptSubmit", turn_id=f"turn-{index}") is None
+                periodic = receipt(invoke("UserPromptSubmit", turn_id="turn-due"))
+                assert periodic != root_receipt
+                assert invoke("UserPromptSubmit", turn_id="turn-due") is None
+                assert invoke("Stop", last_assistant_message=periodic) is None
+                compacted = receipt(invoke("SessionStart", source="compact"))
+                assert compacted != periodic
+                assert invoke("Stop", last_assistant_message=compacted) is None
             receipt(invoke("SessionStart"))
             assert invoke("Stop", last_assistant_message="Synthetic missing receipt")["decision"] == "block"
             last = invoke("Stop", last_assistant_message="Synthetic missing receipt", stop_hook_active=True)

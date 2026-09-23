@@ -5,6 +5,17 @@ in [MLD-DEC-002](docs/decisions/002-standalone-source-extraction.md).
 
 ## [Unreleased]
 
+- Sample long-session attention in Codex every five subsequent user turns and after
+  compaction. Rotate valid questions, issue fresh IDs, and retain one retry per challenge.
+  Temporary cadence metadata contains no prompts or answers; duplicate current-turn
+  delivery and pending checks do not create extra challenges. Other hosts retain their
+  existing start/stop cadence. Updated Codex hook definitions require host trust review.
+
+- Limit each sanity challenge to the next final response and an explicit hook-requested
+  retry. Tell agents to retire its receipt and acknowledgment on later user turns, even
+  while the original challenge remains in conversation context. Require a raw HTML comment
+  so Markdown escaping does not expose the receipt in rendered replies.
+
 - Add source notes, evidence-to-source provenance (`derived_from`) and counterevidence
   (`challenges`, shown as 证伪 / 反证), with versioned editing, reviewed proposals, graph
   styles, filters and traversal. Preserve explicit premise judgement and ticket completion;

@@ -35,7 +35,7 @@ Codex/Claude/ZCode or starts a model session. A bootstrap failure reports a conc
 
 | Host | Local configuration | Lifecycle events |
 |---|---|---|
-| Codex | `.codex/hooks.json` | SessionStart, SubagentStart, Stop, SubagentStop |
+| Codex | `.codex/hooks.json` | SessionStart, UserPromptSubmit, SubagentStart, Stop, SubagentStop |
 | Claude Code | `.claude/settings.local.json` | SessionStart, SubagentStart, Stop, SubagentStop |
 | ZCode | `.zcode/config.json` | SessionStart, Stop; inherited adapter has no subagent events |
 
@@ -90,9 +90,29 @@ question and its fixture. Bootstrap rejects stale anchors. Runtime filters stale
 and warns if no question remains. Questions concern current user language, attention,
 shared principles, missing input, graph identity, writes and completion.
 
+Codex also checks every five subsequent user turns after a challenge. Its
+`UserPromptSubmit` handler counts distinct `turn_id` values without retaining prompt text.
+The prompt accompanying a pending startup check is not counted, duplicate delivery of
+the current turn is ignored, and a pending check keeps its original ID and retry budget.
+Stops and repair continuations do not advance the counter. Missing turn identity warns
+and skips the periodic check rather than counting an unknown event as another turn.
+
+Compaction triggers `SessionStart` with `source: "compact"`, including compaction in the
+middle of a turn. The existing unfiltered start handler issues a fresh challenge and
+resets the interval; it does not need an additional `PostCompact` handler. See the
+[official Codex lifecycle reference](https://learn.chatgpt.com/docs/hooks#sessionstart).
+Each fresh challenge gets a new random ID and moves to the next currently valid question,
+cycling through the bank before repeating. Only the initial choice is derived from the
+start context. Claude Code and ZCode retain their existing start/stop cadence; periodic
+user-turn wiring is currently Codex-only.
+
 The model acknowledges submission in the user's language and places one hidden receipt
-in the final message. The receipt uses the supplied challenge ID and one answer token;
-the model must not read the temporary expected value. Tests use only synthetic scopes.
+in its next final message only. It does not repeat that receipt or acknowledgment on later
+user turns unless a stop hook explicitly requests a retry. A newly issued challenge
+supersedes earlier challenges; an old block retained in context is not a new request.
+The receipt uses the supplied challenge ID and one answer token; the model must not read
+the temporary expected value. Write it as a raw HTML comment without Markdown escaping,
+backticks or a code fence so it stays hidden. Tests use only synthetic scopes.
 Stop grades `last_assistant_message`; it never follows a transcript path or scans history.
 A missing/wrong/duplicate/replayed receipt requests one continuation without disclosing
 the expected token. A second failure warns and allows stopping. Malformed input or missing
@@ -104,6 +124,10 @@ Default state is `<OS temp>/moldloft-startup-sanity-v1/<checkout hash>/<host>/`.
 filenames hash the session/agent scope. An explicit host is recorded only from the launcher;
 missing identities remain unknown. A pending file includes the expected token; it is not
 a record for an agent to inspect. Successful completion or bounded failure removes it.
+Separate `cadence/<scope hash>.json` files retain only a turn count, the last question ID,
+the last turn's hash and update time. They survive receipt completion so future checks
+can rotate questions. They expire after two hours without cadence activity and are pruned
+on hook access. Loss or expiry resets scheduling and rotation, never fabricates a pass.
 
 Audit SQLite rows store invocation times, recognized events, hashed identities,
 question/challenge IDs, outcome and exception class. They contain no payload, prose,
@@ -137,6 +161,7 @@ python -B tools/agent_hooks/bootstrap.py --self-test
 
 Fixtures cover correct/incorrect/replayed/duplicate receipts, one retry, root/subagent
 isolation, Unicode input under non-UTF-8 consoles, audit failure/concurrency/retention,
+periodic intervals, duplicate turns, question rotation, compaction resets, cadence expiry,
 relocation, repeated install, foreign settings and literal launcher paths. The source
 archive carries this guide, tools and tests; generated local settings and temporary state
 are excluded. The wheel remains the application package only.

@@ -51,9 +51,18 @@ explicit acceptance of model-proposed edits.
 distribution, outside the application wheel. `startup_sanity.py` selects one locally
 anchored rule at SessionStart/SubagentStart, emits a Moldloft-specific challenge, and grades
 the final receipt at Stop/SubagentStop. Claude Code and Codex have all four events; the
-retained ZCode adapter has root start/stop only. Selection is deterministic for a start
-context; a random challenge ID rejects replay from an earlier start. One failed receipt
+retained ZCode adapter has root start/stop only. The first question is deterministic for a
+start context; later challenges rotate through valid questions. A random challenge ID
+rejects replay from an earlier start. One failed receipt
 can continue the agent once; another failure or unavailable infrastructure fails open visibly.
+The injected instruction applies to the next final response only, plus an explicit hook
+retry. It retires the receipt and acknowledgment on later user turns and supersedes older
+challenges, so retained conversation context does not create a recurring submission duty.
+Codex additionally counts distinct user turns through `UserPromptSubmit` and issues a
+challenge every five subsequent turns. A pending challenge suppresses periodic issuance
+without resetting its retry budget. `SessionStart` after compaction issues immediately and
+resets the interval. Separate temporary cadence metadata retains the count, last question
+and hashed last turn, expiring after two hours of inactivity; it contains no prompt or answer.
 
 `sanity_audit.py` records process entry/outcome without payloads, transcripts, answers or
 source anchors. Default state lives under OS temporary storage, partitioned by a hash of

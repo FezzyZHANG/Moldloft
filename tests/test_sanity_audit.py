@@ -58,6 +58,41 @@ class SanityAuditTests(unittest.TestCase):
         self.assertEqual(rows[0]["challenge_id"], rows[1]["challenge_id"])
         self.assertTrue(all(row["finished_at"] >= row["started_at"] for row in rows))
 
+    def test_multiple_checks_in_one_session_do_not_reopen_retired_challenges(self):
+        # Simulate a start/resume in a conversation that still contains the old
+        # instruction, including a later response that renders an escaped receipt.
+        for start, stop, fields in (
+            ("SessionStart", "Stop", {}),
+            ("SubagentStart", "SubagentStop", {"agent_id": "fixture-child"}),
+        ):
+            with self.subTest(start=start):
+                def invoke(event, **extra):
+                    return self.run_hook(event, **fields, **extra)
+
+                invoke(start)
+                old_receipt = self.receipt(stop, **fields)
+                self.assertIsNone(invoke(stop, last_assistant_message=old_receipt))
+                escaped_receipt = "\\" + old_receipt.replace("_", "\\_")
+                for message in ("Later task finished.", escaped_receipt):
+                    self.assertIsNone(invoke(stop, last_assistant_message=message))
+
+                output = io.StringIO()
+                self.assertEqual(sanity.main(io.StringIO(json.dumps({
+                    "hook_event_name": start, "session_id": "fixture-private-session", **fields,
+                })), output, state_dir=self.state_dir,
+                    challenge_id_factory=lambda: "audit0002"), 0)
+                context = json.loads(output.getvalue())["hookSpecificOutput"]["additionalContext"]
+                self.assertIn("<!-- moldloft-sanity:audit0002:ANSWER -->", context)
+                current_receipt = self.receipt(stop, **fields)
+                self.assertNotEqual(old_receipt, current_receipt)
+                self.assertEqual(invoke(stop, last_assistant_message=old_receipt)["decision"], "block")
+                self.assertIsNone(invoke(stop, last_assistant_message=current_receipt))
+                self.assertIsNone(invoke(stop, last_assistant_message="Another task finished."))
+                self.assertEqual(self.outcomes()[-8:], [
+                    "challenge_issued", "passed", "no_pending", "no_pending",
+                    "challenge_issued", "retry_requested", "passed", "no_pending",
+                ])
+
     def test_retry_then_fail_open_preserves_policy(self):
         self.run_hook("SessionStart")
         self.assertEqual(self.run_hook()["decision"], "block")

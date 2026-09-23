@@ -62,6 +62,8 @@ Complete the host's normal trust/review step, then start or resume a development
 Codex uses `/hooks`. Setup never grants trust or claims live activation. See
 [agent-hook operations](docs/agent-hooks.md) for the protocol, audit and exact verification
 boundaries. This is developer tooling; running the Moldloft application does not require it.
+Codex checks again every five subsequent user turns and after compaction, rotating through
+valid questions. Each completed receipt retires; later checks use fresh challenge IDs.
 
 ## Run
 

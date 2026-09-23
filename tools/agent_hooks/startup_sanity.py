@@ -1,6 +1,6 @@
-"""Offline startup attention check for agent lifecycle hooks.
+"""Offline attention checks for agent lifecycle hooks.
 
-The start hooks choose one question anchored in ``AGENTS.md`` and remember the
+Start and periodic hooks choose one question anchored in ``AGENTS.md`` and remember the
 expected token in the operating system's temporary directory.  The matching
 stop hook checks only the final assistant message.  A failed check may continue
 the agent once; a second failure is reported visibly and allowed through so a
@@ -34,6 +34,8 @@ AGENTS_PATH = ROOT / "AGENTS.md"
 DEFAULT_STATE_DIR = sanity_audit.state_directory()
 
 START_EVENTS = frozenset({"SessionStart", "SubagentStart"})
+PROMPT_EVENT = "UserPromptSubmit"
+CHECK_INTERVAL = 5
 STOP_EVENTS = frozenset({"Stop", "SubagentStop"})
 CHALLENGE_ID_RE = re.compile(r"[A-Za-z0-9_-]{8,64}\Z")
 MARKER_RE = re.compile(
@@ -197,7 +199,7 @@ def contract_text(path: Path | str) -> str:
 def _choose_question(
     questions: list[Question], payload: dict[str, object], scope: str
 ) -> Question:
-    # Selection is reproducible for a given start context.  The independently
+    # Initial selection is reproducible for a given start context. The independently
     # generated challenge id exists only to reject a receipt replayed from an
     # earlier start, never to influence which development rule is tested.
     material = "\0".join(
@@ -249,15 +251,56 @@ def _additional_context(question: Question, challenge_id: str) -> str:
         (
             "<moldloft-sanity>",
             "This is an offline attention check drawn from the adopted development contract.",
+            "This challenge supersedes any earlier challenge in this conversation.",
             f"Question [{question.id}]: {question.prompt}",
-            "At the end of your final assistant message, append exactly one hidden comment",
+            "At the end of your next final assistant message only, append exactly one hidden comment",
             "in this shape, replacing ANSWER with the selected token:",
             f"<!-- moldloft-sanity:{challenge_id}:ANSWER -->",
+            "Write the raw comment without Markdown escaping, backticks or a code fence.",
             "Keep the challenge id unchanged. Do not expose the marker in visible prose.",
             "Acknowledge submission once in the user's language; only the stop hook can verify it.",
+            "After submitting, do not repeat this receipt or acknowledgment on later user turns.",
+            "Resubmit only if a stop hook explicitly requests a retry for this challenge.",
+            "An earlier challenge remaining in conversation context is not a new request.",
             "</moldloft-sanity>",
         )
     )
+
+
+def _cadence_path(path: Path) -> Path:
+    return path.parent / "cadence" / path.name
+
+
+def _read_cadence(path: Path) -> dict[str, object]:
+    empty = {"turns": 0, "last_question": None, "last_turn": None}
+    if not path.exists():
+        return empty
+    try:
+        state = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(state, dict):
+            raise ValueError
+        updated = state.get("updated_at")
+        if not isinstance(updated, (int, float)):
+            raise ValueError
+        if updated < time.time() - sanity_audit.RETENTION_SECONDS:
+            path.unlink(missing_ok=True)
+            return empty
+        if type(state.get("turns")) is not int or not 0 <= state["turns"] < CHECK_INTERVAL:
+            raise ValueError
+        if state.get("last_question") is not None and (
+            not isinstance(state["last_question"], str)
+            or not re.fullmatch(r"[a-z0-9-]{1,64}", state["last_question"])
+        ):
+            raise ValueError
+        if state.get("last_turn") is not None and (
+            not isinstance(state["last_turn"], str)
+            or not re.fullmatch(r"[0-9a-f]{64}", state["last_turn"])
+        ):
+            raise ValueError
+        return state
+    except (ValueError, OSError) as exc:
+        path.unlink(missing_ok=True)
+        raise SanityUnavailable("the sanity cadence state is unreadable or invalid") from exc
 
 
 def _start(
@@ -268,11 +311,13 @@ def _start(
     agents_path: Path | str,
     challenge_id_factory: Callable[[], str],
     audit: dict[str, object],
+    cadence: dict[str, object] | None = None,
 ) -> dict[str, object]:
     path = state_path(payload, event, state_dir)
     # A new start supersedes any abandoned challenge for this exact scope.  Clear
     # it first so a later startup failure cannot make Stop grade stale state.
     path.unlink(missing_ok=True)
+    cadence = _read_cadence(_cadence_path(path)) if cadence is None else cadence
     agents_text = contract_text(agents_path)
     questions = _valid_questions(agents_text)
     if not questions:
@@ -284,6 +329,10 @@ def _start(
 
     scope = _scope(payload, event)
     question = _choose_question(questions, payload, scope)
+    previous = next((index for index, item in enumerate(questions)
+                     if item.id == cadence["last_question"]), None)
+    if previous is not None:
+        question = questions[(previous + 1) % len(questions)]
     pending = {
         "version": 1,
         "challenge_id": challenge_id,
@@ -297,6 +346,11 @@ def _start(
         "issued_at": time.time(),
         "llm": audit.get("llm"),
     }
+    cadence.update(turns=0, last_question=question.id, updated_at=time.time())
+    turn = _text_field(payload, "turn_id")
+    if turn:
+        cadence["last_turn"] = sanity_audit.identity(turn)
+    _write_state(_cadence_path(path), cadence)
     _write_state(path, pending)
     audit.update(outcome="challenge_issued", challenge_id=challenge_id, question_id=question.id)
     return {
@@ -305,6 +359,37 @@ def _start(
             "additionalContext": _additional_context(question, challenge_id),
         }
     }
+
+
+def _prompt(payload: dict[str, object], *, state_dir: Path | str,
+            agents_path: Path | str, challenge_id_factory: Callable[[], str],
+            audit: dict[str, object]) -> dict[str, object] | None:
+    turn = _text_field(payload, "turn_id")
+    if not turn:
+        raise SanityUnavailable("periodic sanity requires a turn identifier")
+    path = state_path(payload, PROMPT_EVENT, state_dir)
+    cadence = _read_cadence(_cadence_path(path))
+    turn_hash = sanity_audit.identity(turn)
+    if cadence["last_turn"] == turn_hash:
+        audit["outcome"] = "duplicate_turn"
+        return None
+    cadence.update(last_turn=turn_hash, updated_at=time.time())
+    pending = _read_state(path)
+    if pending is not None:
+        # Start followed by prompt submission must not double-check the first
+        # turn, overwrite an interrupted challenge, or reset its retry budget.
+        if cadence["last_question"] is None:
+            cadence["last_question"] = pending.get("question_id")
+        audit["outcome"] = "pending"
+    else:
+        cadence["turns"] += 1
+        if cadence["turns"] >= CHECK_INTERVAL:
+            return _start(payload, PROMPT_EVENT, state_dir=state_dir,
+                          agents_path=agents_path, challenge_id_factory=challenge_id_factory,
+                          audit=audit, cadence=cadence)
+        audit["outcome"] = "not_due"
+    _write_state(_cadence_path(path), cadence)
+    return None
 
 
 def _answer_matches(message: object, state: dict[str, object]) -> bool:
@@ -419,18 +504,20 @@ def handle_hook(
     session = _text_field(payload, "session_id", "thread_id", "conversation_id")
     if session:
         audit["session_hash"] = sanity_audit.identity(session)
-    if event in START_EVENTS | STOP_EVENTS:
+    if event in START_EVENTS | STOP_EVENTS | {PROMPT_EVENT}:
         audit["scope_hash"] = sanity_audit.identity(_scope(payload, event))
-    if event in START_EVENTS:
-        result = _start(
+    if event in START_EVENTS or event == PROMPT_EVENT:
+        operation = _prompt if event == PROMPT_EVENT else _start
+        result = operation(
             payload,
-            event,
+            **({"event": event} if event in START_EVENTS else {}),
             state_dir=state_dir,
             agents_path=agents_path,
             challenge_id_factory=challenge_id_factory or (lambda: secrets.token_hex(8)),
             audit=audit,
         )
-        result["hookSpecificOutput"]["additionalContext"] = intro + result["hookSpecificOutput"]["additionalContext"]
+        if result is not None:
+            result["hookSpecificOutput"]["additionalContext"] = intro + result["hookSpecificOutput"]["additionalContext"]
         return result
     if event in STOP_EVENTS:
         return _stop(payload, event, state_dir=state_dir, audit=audit)
@@ -489,7 +576,8 @@ def main(
             target.reconfigure(encoding="utf-8", errors="replace")
         # Prune only this host/check-out's opaque pending files, without reading answers.
         if state_dir.is_dir():
-            for candidate in state_dir.glob("*.json"):
+            candidates = list(state_dir.glob("*.json")) + list((state_dir / "cadence").glob("*.json"))
+            for candidate in candidates:
                 if re.fullmatch(r"[0-9a-f]{64}\.json", candidate.name):
                     try:
                         if candidate.stat().st_mtime < time.time() - sanity_audit.RETENTION_SECONDS:

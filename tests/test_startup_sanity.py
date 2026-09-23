@@ -96,6 +96,8 @@ class StartupSanityTests(unittest.TestCase):
     def test_question_selection_does_not_depend_on_random_challenge_id(self):
         payload = self._start()
         _, _, first = self._begin(payload, challenge="first000")
+        # Compare cold starts; retained cadence intentionally rotates questions.
+        sanity._cadence_path(sanity.state_path(payload, "SessionStart", self.state_dir)).unlink()
         _, _, second = self._begin(payload, challenge="second00")
         self.assertNotEqual(first["challenge_id"], second["challenge_id"])
         self.assertEqual(first["question_id"], second["question_id"])
@@ -259,6 +261,98 @@ class StartupSanityTests(unittest.TestCase):
         result = sanity.handle_hook(self._stop(), state_dir=self.state_dir)
         self.assertIsNone(result)
 
+    def _submit(self, turn, session="session-a"):
+        return sanity.handle_hook({"hook_event_name": "UserPromptSubmit",
+            "session_id": session, "turn_id": turn, "prompt": "private fixture prompt"},
+            state_dir=self.state_dir)
+
+    def _pass_pending(self):
+        path = sanity.state_path(self._stop(), "Stop", self.state_dir)
+        state = json.loads(path.read_text(encoding="utf-8"))
+        marker = f"<!-- moldloft-sanity:{state['challenge_id']}:{state['expected_answer']} -->"
+        self.assertIsNone(sanity.handle_hook(self._stop(message=marker), state_dir=self.state_dir))
+        return state
+
+    def test_periodic_checks_every_five_subsequent_turns_and_deduplicates(self):
+        self._begin()
+        self.assertIsNone(self._submit("first-turn"))
+        first = self._pass_pending()
+        for cycle in range(2):
+            for index in range(4):
+                turn = f"private-turn-{cycle}-{index}"
+                self.assertIsNone(self._submit(turn))
+                self.assertIsNone(self._submit(turn))
+                self.assertIsNone(sanity.handle_hook(self._stop(), state_dir=self.state_dir))
+            result = self._submit(f"due-{cycle}")
+            self.assertEqual(result["hookSpecificOutput"]["hookEventName"], "UserPromptSubmit")
+            self.assertIsNone(self._submit(f"due-{cycle}"))
+            current = self._pass_pending()
+            self.assertNotEqual(first["challenge_id"], current["challenge_id"])
+            self.assertNotEqual(first["question_id"], current["question_id"])
+            first = current
+        metadata = next((self.state_dir / "cadence").glob("*.json")).read_text("utf-8")
+        for private in ("private-turn", "private fixture prompt", "expected_answer", "source_anchor"):
+            self.assertNotIn(private, metadata)
+
+    def test_compaction_rotates_immediately_and_restarts_interval(self):
+        self._begin()
+        first = self._pass_pending()
+        for index in range(3):
+            self.assertIsNone(self._submit(f"before-{index}"))
+        result, _, compacted = self._begin(dict(self._start(), source="compact"), "compact0")
+        self.assertIn("compact0", result["hookSpecificOutput"]["additionalContext"])
+        self.assertNotEqual(first["question_id"], compacted["question_id"])
+        self._pass_pending()
+        for index in range(4):
+            self.assertIsNone(self._submit(f"after-{index}"))
+        self.assertIsNotNone(self._submit("after-due"))
+
+    def test_questions_rotate_through_valid_bank_before_repeating(self):
+        questions = sanity._valid_questions(sanity.contract_text(ROOT / "AGENTS.md"))
+        selected = []
+        for index in range(len(questions) + 1):
+            self._begin(dict(self._start(), source="compact"), f"rotate{index:02}")
+            selected.append(self._pass_pending()["question_id"])
+        self.assertEqual(len(set(selected[:-1])), len(questions))
+        self.assertEqual(selected[0], selected[-1])
+
+    def test_periodic_prompts_preserve_pending_challenge_and_retry_limit(self):
+        _, path, first = self._begin()
+        self.assertEqual(sanity.handle_hook(self._stop(), state_dir=self.state_dir)["decision"], "block")
+        for index in range(6):
+            self.assertIsNone(self._submit(f"pending-{index}"))
+        pending = json.loads(path.read_text("utf-8"))
+        self.assertEqual(first["challenge_id"], pending["challenge_id"])
+        self.assertTrue(pending["retry_used"])
+        result = sanity.handle_hook(self._stop(), state_dir=self.state_dir)
+        self.assertIn("fail-open", result["systemMessage"])
+        self.assertIsNone(sanity.handle_hook(self._stop(), state_dir=self.state_dir))
+        for index in range(4):
+            self.assertIsNone(self._submit(f"fresh-{index}"))
+        self.assertIsNotNone(self._submit("fresh-due"))
+
+    def test_periodic_counter_isolates_sessions_and_requires_turn_identity(self):
+        for index in range(4):
+            self.assertIsNone(self._submit(f"a-{index}"))
+        self.assertIsNone(self._submit("b-1", session="session-b"))
+        with self.assertRaises(sanity.SanityUnavailable):
+            self._submit("")
+        self.assertIsNotNone(self._submit("a-due"))
+        self.assertIsNone(self._submit("b-2", session="session-b"))
+
+    def test_expired_and_malformed_cadence_degrade_without_inventing_success(self):
+        self.assertIsNone(self._submit("first"))
+        path = sanity._cadence_path(sanity.state_path(self._stop(), "Stop", self.state_dir))
+        state = json.loads(path.read_text("utf-8"))
+        state.update(updated_at=0, turns=4)
+        path.write_text(json.dumps(state), encoding="utf-8")
+        self.assertIsNone(self._submit("after-expiry"))
+        self.assertEqual(json.loads(path.read_text("utf-8"))["turns"], 1)
+        path.write_text("{", encoding="utf-8")
+        with self.assertRaises(sanity.SanityUnavailable):
+            self._submit("bad-state")
+        self.assertFalse(path.exists())
+
     def test_main_reads_stdin_and_writes_only_json(self):
         source = io.StringIO(json.dumps(self._start()))
         target = io.StringIO()
@@ -315,7 +409,9 @@ class StartupSanityTests(unittest.TestCase):
         payload = self._stop(message=message)
         for console_encoding in ("ascii", "cp936"):
             with self.subTest(console_encoding=console_encoding):
-                self._begin()
+                _, _, current = self._begin()
+                payload["last_assistant_message"] = message.replace(
+                    state["expected_answer"], current["expected_answer"])
                 completed = self._run_hook_process(payload, console_encoding)
                 self.assertEqual(completed.returncode, 0)
                 self.assertEqual(completed.stdout.decode("utf-8").strip(), "")

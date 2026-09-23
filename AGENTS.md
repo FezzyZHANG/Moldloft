@@ -80,13 +80,21 @@ When the host supplies a `<moldloft-sanity>` challenge:
 1. Answer it from this contract while continuing the user's task. Acknowledge submission
    once in the user's language, or acknowledge resubmission on a hook-requested retry.
    Do not claim a pass: only the stop hook verifies the receipt.
-2. Put exactly one `<!-- moldloft-sanity:<id>:<answer> -->` comment at the end of the final
-   assistant message, using the supplied ID and one requested answer token. Keep the
-   answer/receipt out of visible prose.
+2. Put exactly one `<!-- moldloft-sanity:<id>:<answer> -->` comment at the end of the next
+   final assistant message only, using the supplied ID and one requested answer token.
+   Write the raw comment without Markdown escaping, backticks or a code fence; keep the
+   answer/receipt out of visible prose. After submitting, do not repeat the
+   receipt or acknowledgment on later user turns unless a stop hook explicitly requests
+   a retry. A newly issued challenge supersedes earlier challenges; an old block retained
+   in conversation context is not a new request.
 3. Never inspect a real pending expected answer or use synthetic verification as a receipt
    for the current session. Tests may inspect only their own disposable fixture state.
 4. Repair one hook-requested failure; a second failure produces a warning and allows the
    turn to finish. Infrastructure failure also degrades visibly without blocking work.
+
+Codex issues fresh challenges every five subsequent user turns and after context compaction,
+rotating questions. Each new challenge is independent of a retired receipt; answer only the
+latest issued challenge. Other hosts retain their supported start/stop lifecycle.
 
 The hook reads this contract and its own temporary state only, without application data,
 transcripts, network or an additional model call. It tests instruction uptake, not security
@@ -154,8 +162,9 @@ Keep the existing exceptions explicit:
 - **Secrets and private configuration:** never print, commit or copy into diagnostics.
   Keep example settings synchronized with `config.py` and the model adapter. No automatic
   backup is promised; security is not a reason to describe them as regenerable.
-- **Agent hook state:** pending checks and metadata-only audit are disposable, local,
-  isolated by checkout/host/session/agent, and pruned on access after two hours. Generated
+- **Agent hook state:** pending checks, cadence metadata and metadata-only audit are disposable, local,
+  isolated by checkout/host/session/agent, and pruned on access after two hours (cadence
+  expires after two hours of inactivity). Generated
   host wiring is ignored and rebuilt by bootstrap; unrelated merged settings remain private
   operator configuration. [MLD-DEC-005](docs/decisions/005-portable-sanity-bootstrap.md)
   records these storage and recovery limits.

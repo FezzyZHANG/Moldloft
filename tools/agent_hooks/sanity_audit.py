@@ -20,7 +20,7 @@ import time
 
 RETENTION_SECONDS = 2 * 60 * 60
 ROOT = Path(__file__).resolve().parents[2]
-EVENTS = {"SessionStart", "SubagentStart", "Stop", "SubagentStop"}
+EVENTS = {"SessionStart", "SubagentStart", "Stop", "SubagentStop", "UserPromptSubmit"}
 HOSTS = {"claude", "codex", "zcode"}
 
 
@@ -37,6 +37,7 @@ DEFAULT_DB = state_directory() / "audit.sqlite3"
 OUTCOMES = {
     "received", "challenge_issued", "passed", "retry_requested", "failed_open",
     "no_pending", "ignored", "error",
+    "not_due", "pending", "duplicate_turn",
 }
 
 
