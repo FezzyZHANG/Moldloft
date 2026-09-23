@@ -120,7 +120,8 @@ trust or use a trust-bypass flag. Until a real lifecycle fires, report activatio
   unavailable storage must not be replaced by an empty graph.
 - Each configured notebook owns its Markdown text and typed relations. Use file-hash
   versions and atomic single-file replacement, or deliberate Markdown edits. `assumes`,
-  `supports`, `relates` and `option` never create execution blockers or adopt a premise.
+  `supports`, `challenges`, `derived_from`, `relates` and `option` never create execution
+  blockers, adopt a premise or automatically refute one.
 - Save on leaving the whole editor, finish IME composition first, and show saved only after
   acknowledgement. Retain failed drafts and visible conflicts. Layout strategies remain
   replaceable; preserve selection context without storing manual coordinates.

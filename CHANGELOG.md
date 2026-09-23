@@ -5,6 +5,13 @@ in [MLD-DEC-002](docs/decisions/002-standalone-source-extraction.md).
 
 ## [Unreleased]
 
+- Add source notes, evidence-to-source provenance (`derived_from`) and counterevidence
+  (`challenges`, shown as 证伪 / 反证), with versioned editing, reviewed proposals, graph
+  styles, filters and traversal. Preserve explicit premise judgement and ticket completion;
+  validate final provenance targets and show external conflicts. Existing notes need no
+  migration; upgrade/restart all writers before authoring new kinds or relations.
+  See [MLD-DEC-008](docs/decisions/008-source-evidence-loop.md).
+
 - Add multiple metadata notes per Drydock, with a separate web list and ordinary versioned
   editing. Preserve overview/index navigation while excluding metadata and its incident
   links from graph projection, premise propagation and automatic Copilot/MCP context.

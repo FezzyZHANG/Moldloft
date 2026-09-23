@@ -72,6 +72,7 @@ synchronization adapter; tools rewriting frontmatter must preserve this subset.
 | question | open, resolved, archived |
 | idea | open, selected, parked |
 | evidence | recorded, superseded |
+| source | recorded, superseded |
 | decision | proposed, accepted, superseded |
 | metadata | recorded |
 
@@ -84,12 +85,14 @@ Archival is a state change; there is no automatic cleanup or note deletion endpo
 |---|---|---|
 | assumes | assumption -> adopting ticket/note | Propagate premise identity and review hints |
 | supports | evidence -> supported ticket/note | Record support; never certify truth or completion |
+| challenges | evidence -> challenged ticket/note | Record counterevidence; never automatically refute or change work |
+| derived_from | evidence -> source note | Record provenance, not endorsement or an execution dependency |
 | relates | note -- ticket/note | Context only, with no required order |
 | option | idea -> question/decision/work | Candidate; no execution gate or automatic selection |
 
 Only ticket `requires` edges belong to the execution DAG. Exploration links may cycle.
 Premises propagate through `assumes` and then execution dependencies, with a visited set;
-they do not propagate through related/support/option links. An unadopted, refuted or retired
+they do not propagate through related/support/challenge/provenance/option links. An unadopted, refuted or retired
 premise marks affected tickets for review without changing their status. Adoption is a
 working commitment, not a mathematical proof. Supporting evidence does not auto-adopt it.
 Adoption binds to the title and body via an `adopted_digest` header. Editing either through
@@ -97,6 +100,41 @@ the API returns the assumption to `proposed` unless the request explicitly adopt
 text. An external edit with a stale/missing digest is displayed as proposed without rewriting
 the file. Review and adopt it in the Web editor to bind the new text; hand-editing the state
 alone is insufficient. Relations may change without changing the premise's meaning.
+
+## Sources and counterevidence
+
+A `source` identifies a report, paper, dataset or observation record. Keep its citation,
+authors/date, DOI or URL, version and retrieval limits in the authored body; no extra
+frontmatter fields or external document store are introduced. `recorded` means catalogued,
+not verified or endorsed. `superseded` retains the old source identity and references.
+Source notes appear in the ordinary graph and own only `relates` links. They do not act as
+premises merely because evidence cites them.
+
+An evidence note can collect material from several sources around one question. Give each
+source a `derived_from` reference and identify its page, table, section or record in the
+body, preserving conditions and disagreements. Split findings when they need independent
+reuse or assessment. Candidate explanations belong in `idea`; a working premise remains
+an `assumption`, with explicit adoption separate from supporting or challenging evidence.
+
+Only evidence owns `derived_from` or `challenges`. Provenance targets must be source notes,
+including forward aliases in proposals. A referenced source cannot change to another kind
+until its incoming provenance links are removed or changed in the same reviewed batch.
+Cross-note validation uses the final batch, independent of file-write order. Missing sources
+remain visible; external kind conflicts produce notebook errors without rewriting files.
+
+`challenges` (shown as **证伪 / 反证**) records counterevidence to the target's judgment or
+basis. Explain the observation, scope and limitations; lack of a significant effect alone
+does not assert falsification. The relation never changes an assumption to `refuted`, adopts
+another premise, or alters ticket status/readiness. Those judgements remain explicit edits.
+Support and counterevidence may coexist. A challenge uses a heavy dashed line with a bar
+endpoint; provenance uses a short dashed line with an open arrow pointing to the source.
+Both have labels, filters, backlinks and directional local traversal.
+
+These extensions are additive: existing files are not converted or rewritten on read.
+Upgrade every writer and restart serving processes before authoring the new kind/relations;
+older readers report them as unsupported. The existing version, proposal review and recovery
+contracts apply. Copilot receives only its existing bounded authored-note context; URLs and
+paths are never fetched. See [MLD-DEC-008](decisions/008-source-evidence-loop.md).
 
 ## Metadata
 

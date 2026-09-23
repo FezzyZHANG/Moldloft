@@ -1,7 +1,7 @@
 # Moldloft
 
 A local ticket dependency graph and Markdown exploration notebook. Tickets describe
-execution; notes retain assumptions, questions, ideas, evidence and decisions. The graph
+execution; notes retain assumptions, questions, ideas, evidence, sources and decisions. The graph
 makes their relationships visible without turning every thought into a task.
 
 Moldloft is an independent copy of the ticket tool developed in `newlife`. It preserves
@@ -192,8 +192,8 @@ See [the isolation decision](docs/decisions/003-drydock-graph-isolation.md).
 
 ## Exploration alongside execution
 
-The left sidebar separates tickets from **Notes**. Assumptions, questions, ideas, evidence
-and decisions live in tracked Markdown under [notes/](docs/notebook.md), with stable IDs and
+The left sidebar separates tickets from **Notes**. Assumptions, questions, ideas, evidence,
+sources and decisions live in tracked Markdown under [notes/](docs/notebook.md), with stable IDs and
 their own states. Select or create a note, edit its text and typed relations, then leave the
 editor to save. New notes require explicit creation. They never become extra tickets.
 
@@ -219,6 +219,14 @@ uses heavier solid arrows; related context uses dotted lines without an arrow; c
 options use dash-dot lines with diamond endpoints. Labels and a filterable legend supplement
 color. Only execution prerequisites block tasks. Premise review hints follow dependencies
 without rewriting task status. The node label **No execution blockers** makes that scope explicit.
+
+Use **来源 / Source** for a paper, report, dataset or observation record, keeping citation and
+version details in its body. In an evidence note, **证据出处** (`derived_from`) points to a
+source; **证伪 / 反证** (`challenges`) records counterevidence to another note or ticket.
+Provenance uses a short dashed open arrow and counterevidence a heavy dashed bar endpoint.
+Neither relation adopts/refutes a premise or changes task completion. A source is catalogued,
+not automatically endorsed. Upgrade and restart all writers before using these additions;
+existing notes need no migration. See [sources and counterevidence](docs/notebook.md#sources-and-counterevidence).
 
 **Local graph** shows one to three hops around the selected ticket or note. Choose upstream
 (上游, against arrows), downstream (下游, along arrows), or both (双向, the default).
@@ -507,6 +515,11 @@ rerunning the smoke script. Screenshots go to the OS temporary directory.
 Run `node tests/browser.notes.mjs` against the fixture server to exercise note
 saving/IME/conflicts, bilingual abstract lookup, typed links, backlinks, local graph and
 separate note creation. Restart the fixture before each browser script.
+
+`python -B -m unittest tests.test_sources -v` checks source versions, provenance validation,
+counterevidence without automatic state changes, forward aliases and reviewed conversion.
+`node tests/browser.sources.mjs` checks source creation, provenance targets, distinct edge
+styles, filters, backlinks, local traversal and narrow rendering on the disposable fixture.
 
 `node tests/browser.metadata.mjs` checks separate metadata listing, navigation without
 graph nodes, explicit creation, versioned conversion and conflicts, search, narrow layout

@@ -187,6 +187,16 @@ source. There is no note delete or rename operation, no public note batch-write 
 changes to the versioned human `PUT /api/notes/{id}` path. Adoption and bilingual abstract
 rules remain the notebook contract; an agent cannot propose adopting a premise.
 
+Notes also accept `kind: "source"` with `recorded` or `superseded` state. Citation, version
+and retrieval details belong in the body. Evidence can own `derived_from` links to source
+notes (including `note:new:alias`) and `challenges` links to judgments recorded in notes or
+tickets. These are provenance/counterevidence, never automatic adoption, refutation or
+completion. The reducer validates provenance against final target kinds; conversions must
+remove incompatible incoming provenance in the same batch. Read relevant source notes and
+retain their original basis when proposing an evidence update. Existing bounds and review
+apply; a URL or file citation does not authorize fetching it. See the
+[source contract](docs/notebook.md#sources-and-counterevidence).
+
 ## 6. Storage and review
 
 `proposals` lives in its Drydock's ticket DB (introduced in schema v3, now v4). It stores normalized operations,

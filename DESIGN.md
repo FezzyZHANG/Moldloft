@@ -318,11 +318,21 @@ updates are the explicit cost of compound layout. See its README for exact hashe
 
 ## Exploration semantics and Markdown authority
 
-Assumptions, questions, ideas, evidence and decisions have independent note states and
-stable `n-...` IDs. A note owns outgoing `assumes`, `supports`, `relates` or `option`
-metadata. Only an assumption supplies `assumes`, evidence supplies `supports`, and an
-idea supplies `option`. These links are not added to `TicketEdge` and may contain cycles.
+Assumptions, questions, ideas, evidence, sources and decisions have independent note states and
+stable `n-...` IDs. A note owns outgoing typed relation metadata. Only an assumption supplies
+`assumes`, evidence supplies `supports`, `challenges` and `derived_from`, and an idea supplies
+`option`. Any note can supply `relates`. These links are not added to `TicketEdge` and may contain cycles.
 Parent containment remains separate from both relations and completion.
+
+Source notes identify authored provenance and remain ordinary graph nodes. `derived_from`
+points from evidence to a source; `challenges` points from evidence to the judgment under
+challenge. Neither propagates premises or changes epistemic/work state. Citation details
+and locators stay in Markdown, with no URL/file fetching or new context expansion.
+`notes.validate_targets` checks provenance target kinds in the final proposed notebook;
+the managed writer receives planned notes so valid conversions do not depend on write order.
+External kind conflicts are visible notebook errors, and missing targets retain references.
+The [notebook contract](docs/notebook.md#sources-and-counterevidence) owns the semantics;
+[MLD-DEC-008](docs/decisions/008-source-evidence-loop.md) records scope and compatibility.
 
 Each Drydock also supports multiple `metadata` / `recorded` notes for its overview and
 indexes. They share the Markdown writer and ordinary note identity/version/recovery, but
