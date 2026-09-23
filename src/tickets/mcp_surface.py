@@ -132,7 +132,7 @@ class ReadTools:
                 continue
             haystack = ' '.join(note.get(f, '') for f in ('title', 'abstract_en', 'abstract_zh')).casefold()
             if note['id'] not in linked and note['id'] not in ticket['assumptions'] and any(term in haystack for term in terms):
-                legal = {'assumption': ['assumes', 'relates'], 'evidence': ['supports', 'relates'],
+                legal = {'assumption': ['assumes', 'relates'], 'evidence': ['supports', 'challenges', 'relates'],
                          'idea': ['option', 'relates']}.get(note['kind'], ['relates'])
                 candidate_count += 1
                 items.append({'band': 'candidate', 'linked': False, 'legal_relations': legal,
@@ -155,6 +155,10 @@ def create_mcp(store_getter, drydock_lister):
                  instructions='Call list_drydocks to choose a graph, then pass its stable drydock_id on every scoped call. '
                  'Omission always means default, never the browser selection. Read bounded ticket/note context '
                  'and its basis before proposing. Preserve uncertainty. '
+                 'Source notes identify materials (recorded or superseded); citation details belong in their body. '
+                 'Only evidence supplies derived_from (to source notes) or challenges (counterevidence). '
+                 'These relations never adopt/refute premises or change ticket completion automatically. '
+                 'Read source notes explicitly when needed; references do not authorize fetching URLs or files. '
                  'Submit ticket, note or mixed edits for human review in the graph page; no tool approves or applies. '
                  'A rejected outcome carries the reviewer reason; read it before proposing again. '
                  'English ticket fields are authoritative; cached translations are views, not proposal evidence. '

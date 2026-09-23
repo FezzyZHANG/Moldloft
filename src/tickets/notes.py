@@ -21,10 +21,11 @@ KINDS = {
     "question": ("open", "resolved", "archived"),
     "idea": ("open", "selected", "parked"),
     "evidence": ("recorded", "superseded"),
+    "source": ("recorded", "superseded"),
     "decision": ("proposed", "accepted", "superseded"),
     "metadata": ("recorded",),
 }
-RELATIONS = {"assumes", "supports", "relates", "option"}
+RELATIONS = {"assumes", "supports", "challenges", "derived_from", "relates", "option"}
 ABSTRACT_LIMITS = {"abstract_zh": 600, "abstract_en": 1200}
 FIELDS = {"title", "kind", "state", "body", "relations", *ABSTRACT_LIMITS}
 NOTE_ID = re.compile(r"n-[a-z0-9][a-z0-9-]{0,62}\Z")
@@ -71,10 +72,23 @@ def validate(note):
             raise DomainError("Only an assumption can supply an assumed premise")
         if kind == "supports" and note["kind"] != "evidence":
             raise DomainError("Only evidence can supply a supporting observation")
+        if kind in {"challenges", "derived_from"} and note["kind"] != "evidence":
+            raise DomainError("Only evidence can supply counterevidence or cite a source")
+        if kind == "derived_from" and not target.startswith("note:"):
+            raise DomainError("Evidence provenance must point to a source note")
         if kind == "option" and note["kind"] != "idea":
             raise DomainError("Only an idea can be a candidate option")
         seen.add((kind, target))
     return note
+
+
+def validate_targets(note, notes):
+    """Check cross-note kinds without erasing references to missing sources."""
+    for relation in note["relations"]:
+        if relation["type"] == "derived_from":
+            target = notes.get(relation["target"][5:])
+            if target is not None and target["kind"] != "source":
+                raise DomainError("Evidence provenance must point to a source note", 409)
 
 
 def encode(note):
@@ -159,6 +173,12 @@ class Notebook:
             except DomainError as error:
                 errors.append({"file": path.name, "message": error.message})
                 signatures.append((path.name, "unavailable"))
+        by_id = {note["id"]: note for note in notes}
+        for note in notes:
+            try:
+                validate_targets(note, by_id)
+            except DomainError as error:
+                errors.append({"file": f"{note['id']}.md", "message": error.message})
         revision = hashlib.sha256(json.dumps([signatures, errors], sort_keys=True).encode()).hexdigest()
         return {"notes": notes, "notes_revision": revision, "notes_errors": errors}
 
@@ -166,7 +186,7 @@ class Notebook:
         with transaction(self.engine, [self.path(note_id)]) as connection:
             return self.write_in_transaction(connection, note_id, fields, version, ticket_ids)
 
-    def write_in_transaction(self, connection, note_id, fields, version, ticket_ids, *, planned_note_ids=()):
+    def write_in_transaction(self, connection, note_id, fields, version, ticket_ids, *, planned_note_ids=(), planned_notes=()):
         """Validate and replace using the caller's managed write transaction."""
         if connection.engine is not self.engine:
             raise DomainError("Note connection belongs to a different engine")
@@ -193,12 +213,19 @@ class Notebook:
             if all(candidate[key] == current[key] for key in FIELDS):
                 return current
             raise DomainError("Note changed on disk; compare before saving", 409, current=current)
-        known = {f"ticket:{i}" for i in ticket_ids} | {f"note:{n['id']}" for n in self.snapshot()["notes"]}
+        final_notes = {n["id"]: n for n in self.snapshot()["notes"]}
+        final_notes.update({n["id"]: n for n in planned_notes})
+        known = {f"ticket:{i}" for i in ticket_ids} | {f"note:{i}" for i in final_notes}
         known |= {f'note:{i}' for i in planned_note_ids}
         previous = {(r["type"], r["target"]) for r in (current or {}).get("relations", [])}
         for relation in candidate["relations"]:
             if relation["target"] not in known and (relation["type"], relation["target"]) not in previous:
                 raise DomainError("New relation target does not exist", 409)
+        final_notes[note_id] = candidate
+        for note in final_notes.values():
+            if note["id"] == note_id or any(r["type"] == "derived_from" and r["target"] == f"note:{note_id}"
+                                             for r in note["relations"]):
+                validate_targets(note, final_notes)
         raw = encode(candidate)
         if current and all(candidate[key] == current[key] for key in FIELDS):
             return current

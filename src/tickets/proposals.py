@@ -364,7 +364,7 @@ class Proposals:
             planned_ids = {n['id'] for n in notes}
             for n in notes:
                 self.store.notes.write_in_transaction(connection, n['id'], {k: n[k] for k in NOTE_FIELDS},
-                    (before.get(n['id']) or {}).get('version'), ids, planned_note_ids=planned_ids)
+                    (before.get(n['id']) or {}).get('version'), ids, planned_note_ids=planned_ids, planned_notes=notes)
             result['notes'] = sorted(changed)
             return self.finish(connection, proposal['id'], result, amendments, note)
 

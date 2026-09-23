@@ -48,6 +48,23 @@ class DrydockTests(unittest.TestCase):
         self.assertEqual(response.status_code, 200, response.text)
         return response.json()
 
+    def test_provenance_target_kinds_are_checked_within_the_selected_drydock(self):
+        dock = self.create()
+        for ident, kind, state in [('default', 'source', 'recorded'), (dock, 'question', 'open')]:
+            response = self.client.put('/api/notes/n-source', params={'drydock': ident}, json={
+                'fields': {'title': 'Same local ID', 'kind': kind, 'state': state}})
+            self.assertEqual(response.status_code, 200, response.text)
+        evidence = {'fields': {'title': 'Finding', 'kind': 'evidence', 'state': 'recorded',
+            'relations': [{'type': 'derived_from', 'target': 'note:n-source'}]}}
+        self.assertEqual(self.client.put('/api/notes/n-evidence', json=evidence).status_code, 200)
+        rejected = self.client.put('/api/notes/n-evidence', params={'drydock': dock}, json=evidence)
+        self.assertEqual(rejected.status_code, 409, rejected.text)
+        self.assertIn('source note', rejected.json()['message'])
+        research = self.client.get('/api/graph', params={'drydock': dock}).json()
+        self.assertEqual([n['id'] for n in research['notes']], ['n-source'])
+        default = self.client.get('/api/graph').json()
+        self.assertEqual(default['relations'][0]['type'], 'derived_from')
+
     def test_same_ids_and_retry_keys_are_isolated_with_independent_notebooks(self):
         dock = self.create()
         request_id = str(uuid.uuid4())

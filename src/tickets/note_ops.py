@@ -4,7 +4,7 @@ from __future__ import annotations
 import copy
 import re
 
-from .notes import FIELDS, NOTE_ID, validate, premise_digest
+from .notes import FIELDS, NOTE_ID, validate, validate_targets, premise_digest
 from .service import DomainError
 
 TEMP = re.compile(r'new:[A-Za-z0-9_-]{1,40}\Z')
@@ -91,6 +91,8 @@ def reduce_notes(before, after, operations):
         candidate['path'] = f'notes/{note_id}.md'
         candidate['adoption_stale'] = False
         notes[note_id] = candidate
+    for note in notes.values():
+        validate_targets(note, notes)
     return {**after, 'notes': sorted(notes.values(), key=lambda n: n['id']),
             'notes_revision': before.get('notes_revision'), 'notes_errors': [], 'note_ids': aliases}
 

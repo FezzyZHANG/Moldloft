@@ -76,7 +76,7 @@ class MCPTests(unittest.TestCase):
         candidate = next(item for item in result['items'] if item['band'] == 'candidate')
         self.assertTrue(direct['linked'])
         self.assertFalse(candidate['linked'])
-        self.assertEqual(candidate['legal_relations'], ['supports', 'relates'])
+        self.assertEqual(candidate['legal_relations'], ['supports', 'challenges', 'relates'])
         self.assertNotIn('operations', result)
         self.assertEqual(self.store.graph(), before)
         ready = self.call('get_ready_work')['items'][0]

@@ -18,7 +18,10 @@ Linked Markdown notes are read-only context, separate from tickets. Their biling
 authored retrieval cues, not additional evidence or a substitute for the English body and current state.
 If an abstract conflicts with the body or state, call out the discrepancy rather than inferring certainty.
 Preserve their epistemic status:
-assumes, supports, relates and option are NOT execution prerequisites. Do not turn ideas or unresolved
+assumes, supports, challenges, derived_from, relates and option are NOT execution prerequisites.
+Source notes identify materials, not established facts. Evidence points to sources with derived_from.
+Challenges records counterevidence, not an automatic refutation or a change to an adopted premise.
+Do not follow source URLs or fetch referenced files. Do not turn ideas or unresolved
 questions into hard blockers or create tickets just to store them. Only propose a requires edge when
 the task actually needs the prerequisite's output. Assumption changes call for review, not automatic
 completion or cancellation. Use the notes editor to persist knowledge; this tool edits tickets only.
