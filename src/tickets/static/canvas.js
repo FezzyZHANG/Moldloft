@@ -133,9 +133,10 @@ export class Diagram {
     this.layout = result; this.geometry = geometry; status.textContent = '';
     this.element.dataset.layoutStrategy = this.strategy;
     const defs = svg('defs');
-    for (const type of ['requires', 'assumes', 'supports', 'option']) {
+    for (const type of ['requires', 'assumes', 'supports', 'challenges', 'derived_from', 'option']) {
       const marker = svg('marker', {id: `arrow-${type}`, class: `marker-${type}`, viewBox: '0 0 12 12', refX: 11, refY: 6, markerWidth: 9, markerHeight: 9, orient: 'auto-start-reverse'});
-      const shape = type === 'option' ? 'M 1 6 L 6 1 L 11 6 L 6 11 Z' : type === 'assumes' ? 'M 1 1 L 11 6 L 1 11' : 'M 1 1 L 11 6 L 1 11 Z';
+      const shape = type === 'option' ? 'M 1 6 L 6 1 L 11 6 L 6 11 Z' : type === 'challenges' ? 'M 9 1 L 9 11 M 1 6 L 9 6' :
+        ['assumes', 'derived_from'].includes(type) ? 'M 1 1 L 11 6 L 1 11' : 'M 1 1 L 11 6 L 1 11 Z';
       marker.append(svg('path', {d: shape})); defs.append(marker);
     }
     this.element.replaceChildren(defs);

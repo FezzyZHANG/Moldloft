@@ -95,6 +95,29 @@ test('typed links retain semantics through collapse, filtering and local neighbo
   assert.equal(graph.relations.length, 3, 'projection does not edit source relations');
 });
 
+test('source provenance and counterevidence keep their direction, filters and labels', async () => {
+  const graph = {tickets: [], edges: [], notes: [
+    {id: 'n-source', title: 'Report', kind: 'source', state: 'recorded'},
+    {id: 'n-evidence', title: 'Finding', kind: 'evidence', state: 'recorded'},
+    {id: 'n-premise', title: 'Premise', kind: 'assumption', state: 'adopted'},
+  ], relations: [
+    {source: 'note:n-evidence', target: 'note:n-source', type: 'derived_from', owner: 'n-evidence'},
+    {source: 'note:n-evidence', target: 'note:n-premise', type: 'challenges', owner: 'n-evidence'},
+    {source: 'note:n-evidence', target: 'note:n-premise', type: 'supports', owner: 'n-evidence'},
+  ]};
+  const before = structuredClone(graph), projected = project(graph);
+  assert.deepEqual(projected.edges.map(e => e.data.type).sort(), ['challenges', 'derived_from', 'supports']);
+  assert.deepEqual(projected.edges.flatMap(e => e.labels.map(l => l.text)).sort(), ['出处', '支持', '证伪']);
+  const result = await layout(projected);
+  assert.equal(flatten(result).filter(n => n.data?.note).length, 3);
+  assert.deepEqual([...neighborhood(graph, 'n:n-source', 2, null, 'upstream')].sort(), ['n:n-evidence', 'n:n-source']);
+  assert.deepEqual([...neighborhood(graph, 'n:n-source', 2, null, 'downstream')], ['n:n-source']);
+  assert.deepEqual([...neighborhood(graph, 'n:n-evidence', 1, new Set(['challenges']), 'downstream')].sort(),
+    ['n:n-evidence', 'n:n-premise']);
+  assert.equal(project(graph, new Set(), {types: new Set(['derived_from'])}).edges.length, 1);
+  assert.deepEqual(graph, before);
+});
+
 test('local traversal keeps upstream and downstream paths separate at forks and joins', () => {
   const graph = {tickets: Array.from({length: 9}, (_, i) => ticket(i + 1)), edges: [
     [1, 2], [2, 3], [3, 4], [4, 5], [5, 6], [2, 7], [8, 4], [6, 9],

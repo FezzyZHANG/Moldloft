@@ -40,7 +40,7 @@ export class NotesEditor {
       if (this.draft.values.relations.some(r => r.type === type && r.target === target)) return;
       this.draft.set('relations', [...this.draft.values.relations, {type, target}]); this.renderRelations();
     };
-    $('note-relation-type').onchange = () => this.renderRelationHelp();
+    $('note-relation-type').onchange = () => this.renderOptions();
     $('note-relation-target').onchange = () => this.renderRelationHelp();
     $('note-use-server').onclick = async () => {
       try {
@@ -136,9 +136,10 @@ export class NotesEditor {
     $('note-relation-type').replaceChildren(...relationTypes(kind).map(type => new Option(relationNames[type], type)));
     if (relationTypes(kind).includes(selectedType)) $('note-relation-type').value = selectedType;
     const graph = this.graph();
-    $('note-relation-target').replaceChildren(new Option('选择工单或笔记', ''),
-      ...graph.tickets.map(t => new Option(`#${t.id} ${t.title.slice(0, 40)}`, `ticket:${t.id}`)),
-      ...(graph.notes || []).filter(n => n.id !== this.id).map(n => new Option(`◇ ${n.title}`, `note:${n.id}`)));
+    const provenance = $('note-relation-type').value === 'derived_from';
+    $('note-relation-target').replaceChildren(new Option(provenance ? '选择来源笔记' : '选择工单或笔记', ''),
+      ...(provenance ? [] : graph.tickets.map(t => new Option(`#${t.id} ${t.title.slice(0, 40)}`, `ticket:${t.id}`))),
+      ...(graph.notes || []).filter(n => n.id !== this.id && (!provenance || n.kind === 'source')).map(n => new Option(`◇ ${n.title}`, `note:${n.id}`)));
     if ([...$('note-relation-target').options].some(o => o.value === selectedTarget)) $('note-relation-target').value = selectedTarget;
     this.renderRelationHelp();
   }
@@ -160,7 +161,10 @@ export class NotesEditor {
     const target = this.graph().notes.find(n => `note:${n.id}` === $('note-relation-target').value);
     $('note-relation-help').textContent = isMetadata(this.draft.values) || isMetadata(target) ? '仅用于说明导航，不进入图谱或前提追溯。' :
       {relates: '上下文关联，不要求先后顺序。', assumes: '箭头指向采用此假设的工单或笔记；前提变化时提示复核。',
-      supports: '此证据支持目标判断；关联本身不代表判断已成立。', option: '此想法是目标的候选方案，不会成为执行阻塞。'}[$('note-relation-type').value];
+      supports: '此证据支持目标判断；关联本身不代表判断已成立。',
+      challenges: '此证据对目标判断提供反证；请记录条件与局限，不会自动否定假设或改变工单状态。',
+      derived_from: '箭头指向材料来源；请在正文注明页码、表格或记录位置，引用本身不代表认可。',
+      option: '此想法是目标的候选方案，不会成为执行阻塞。'}[$('note-relation-type').value];
   }
   render() {
     this.form.hidden = !this.active;
