@@ -18,7 +18,8 @@ empty store, and first access opens and recovers its context. Module import perf
 Missing MCP dependencies produce a visible 503 at `/mcp`; ordinary ticket editing remains
 available. Default transport Host/Origin validation permits localhost. If deliberately using
 `--listen`, set `TICKETS_MCP_ALLOWED_HOSTS` to an explicit comma-separated list such as
-`192.168.1.20:8787`. The parent app still rejects cross-origin writes. There is no new
+`192.168.1.20:8787`. Project mode derives this list from the manifest
+[`bind`](docs/project-installation.md#installation-and-configuration). The parent app still rejects cross-origin writes. There is no new
 authentication system: enabling LAN access exposes proposal submission as well as the
 existing trusted-local human API. The tool list is the agent interface, not an authentication
 barrier against arbitrary local programs calling HTTP routes.

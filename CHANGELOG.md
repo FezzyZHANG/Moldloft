@@ -5,6 +5,11 @@ in [MLD-DEC-002](docs/decisions/002-standalone-source-extraction.md).
 
 ## [Unreleased]
 
+- Add an optional project-manifest `bind` (`install --bind <ip>`) so a containing project
+  can serve the LAN reproducibly; omitted keeps `127.0.0.1` and existing manifest bytes.
+  Project launch still refuses `--listen`. MCP Host validation follows the bind, and the
+  editing API remains unauthenticated.
+
 - Sample long-session attention in Codex every five subsequent user turns and after
   compaction. Rotate valid questions, issue fresh IDs, and retain one retry per challenge.
   Temporary cadence metadata contains no prompts or answers; duplicate current-turn

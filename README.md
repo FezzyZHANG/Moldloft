@@ -36,7 +36,7 @@ parent/child agent wiring. Shared principles are optional; omit `--principles sh
 to keep only application/development entry guidance. Hosts are selected explicitly with
 repeatable `--host codex|claude|zcode`; omit hosts for application-only installation.
 The parent need not be a Git repository. Use `--db`, `--notes` and `--port` to retain an
-existing workspace. Installation never opens its data or starts/restarts its server.
+existing workspace. `--bind <ip>` records an unauthenticated LAN listener in the manifest. Installation never opens its data or starts/restarts its server.
 
 `--mode wheel` installs a snapshot instead. Re-run installation after dependency changes
 or relocation; `check` is offline and read-only. To prepare an update while a service

@@ -40,6 +40,7 @@ The versioned `.moldloft/project.json` is the portable configuration authority:
 | `--db` / `db` | `workspace/moldloft/data/tickets.db` |
 | `--notes` / `notes` | `workspace/moldloft/notes`; reviews retain the existing sibling layout |
 | `--port` / `port` | 8787; `run --port` changes only that launch |
+| `--bind` / `bind` | Omitted means `127.0.0.1`; an IP literal such as `192.168.1.20` or `0.0.0.0` listens on the LAN without authentication |
 | `--mode` / `mode` | `editable`, or `wheel` |
 | `--host` / `hosts` | Explicitly selected agent adapters |
 | `--principles` / `principles` | Shared-principle adoption, stored as a boolean |
@@ -79,9 +80,14 @@ its target and profile.
 
 `run` requires a passing check and uses the selected environment to execute
 `python -m tickets --project <root>`. An installed `moldloft --project <root>` also
-supports explicit manifest launch. Project mode uses localhost, models off, no reload,
-no implicit private env file and no Git association. Plain `moldloft` retains its
-existing environment-based behavior.
+supports explicit manifest launch. Project mode listens on the manifest `bind` (localhost
+by default) with models off, no reload, no implicit private env file and no Git association.
+`--listen` is refused there: LAN access is a recorded manifest choice, so a restart
+reproduces it. A non-loopback bind derives MCP Host validation from that address, or from
+this machine's name and addresses for `0.0.0.0`, replacing any inherited
+`TICKETS_MCP_ALLOWED_HOSTS`; the editing API remains unauthenticated. Instance discovery
+tries the bind address, then loopback. Plain `moldloft` retains its existing
+environment-based behavior.
 
 `GET /api/instance` returns project/data paths, process/environment, instance ID and
 version without selecting a Drydock. A matching instance is reused; another project,

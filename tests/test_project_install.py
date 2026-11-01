@@ -23,7 +23,7 @@ from tickets.project_config import CONFIG, RECEIPT, ProjectError, defaults, load
 
 
 def options(**values):
-    args = dict(host=None, principles=None, status_alias=None, mode=None, port=None,
+    args = dict(host=None, principles=None, status_alias=None, mode=None, port=None, bind=None,
                 environment=None, db=None, notes=None, process_record=None, start_path=None)
     return argparse.Namespace(**(args | values))
 
@@ -74,6 +74,17 @@ class ProjectInstallTests(unittest.TestCase):
             self.assertEqual(project.check(self.parent)['status'], 'ready')
         self.assertEqual(snapshot(self.parent), before)
         self.assertFalse((self.parent / 'workspace').exists())
+
+    def test_bind_is_written_only_when_selected_and_retained_on_reinstall(self):
+        self.install_config()
+        self.assertNotIn('bind', load(self.parent))
+        self.install_config(bind='0.0.0.0')
+        self.assertEqual(load(self.parent)['bind'], '0.0.0.0')
+        self.install_config()
+        self.assertEqual(load(self.parent)['bind'], '0.0.0.0')
+        with self.assertRaisesRegex(ProjectError, 'bind'):
+            self.install_config(bind='aglibot.local')
+        self.assertEqual(load(self.parent)['bind'], '0.0.0.0')
 
     def test_selected_hosts_shared_principles_and_foreign_text_survive(self):
         (self.parent / 'AGENTS.md').write_bytes(b'# Existing instructions\r\nKeep this wording.\r\n')

@@ -105,7 +105,8 @@ the package index, but hooks and checks cannot trigger dependency installation.
 
 `project_config.py` is standard-library manifest validation shared by source tooling and
 the wheel. `project_runtime.py` loads that explicitly named configuration, selects absolute
-data paths and starts localhost with models/reload disabled. The generic instance route
+data paths and listens on the manifest bind (localhost unless `bind` names another IP
+literal) with models/reload disabled. The generic instance route
 has no Drydock selection and supports project-specific compatibility aliases. A matching
 process is reused; unrelated or differently configured instances are rejected. A running
 environment is preserved: installation can stage another environment for the next launch

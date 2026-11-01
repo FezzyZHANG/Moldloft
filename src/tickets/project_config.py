@@ -1,6 +1,7 @@
 """Standard-library project manifest shared by the installer and runtime."""
 from __future__ import annotations
 
+import ipaddress
 import json
 from pathlib import Path
 import sys
@@ -9,6 +10,8 @@ import uuid
 CONFIG = Path('.moldloft/project.json')
 RECEIPT = Path('.moldloft/install.local.json')
 HOSTS = ('codex', 'claude', 'zcode')
+# Fields a manifest may omit; absence keeps earlier manifests byte-identical on reinstall.
+OPTIONAL = dict(bind='127.0.0.1')
 
 
 class ProjectError(ValueError):
@@ -52,7 +55,7 @@ def validate(project: Path, config: dict) -> dict:
     if not isinstance(config, dict) or config.get('schema_version') != 1:
         raise ProjectError('Unsupported project manifest; expected schema_version 1')
     required = set(defaults(project, project))
-    if set(config) != required:
+    if not required <= set(config) <= required | set(OPTIONAL):
         raise ProjectError('Project manifest has missing or unknown fields')
     if not isinstance(config['installation_id'], str) or not config['installation_id'].isalnum():
         raise ProjectError('Invalid installation_id')
@@ -78,6 +81,13 @@ def validate(project: Path, config: dict) -> dict:
         raise ProjectError('Notebook must be separate from source, environment and database')
     if type(config['port']) is not int or not 1 <= config['port'] <= 65535:
         raise ProjectError('Port must be between 1 and 65535')
+    if 'bind' in config:
+        try:
+            if not isinstance(config['bind'], str):
+                raise TypeError
+            ipaddress.ip_address(config['bind'])
+        except (TypeError, ValueError):
+            raise ProjectError('bind must be an IP address literal') from None
     if config['mode'] not in ('editable', 'wheel') or type(config['principles']) is not bool:
         raise ProjectError('Invalid installation mode or principles option')
     hosts = config['hosts']
@@ -92,6 +102,10 @@ def validate(project: Path, config: dict) -> dict:
     if not isinstance(start, str) or not start.startswith('/') or start.startswith('//'):
         raise ProjectError('start_path must be a local URL path')
     return config
+
+
+def bind_address(config: dict) -> ipaddress.IPv4Address | ipaddress.IPv6Address:
+    return ipaddress.ip_address(config.get('bind', OPTIONAL['bind']))
 
 
 def read_json(path: Path) -> dict | None:

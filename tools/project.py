@@ -222,7 +222,7 @@ def configure(project: Path, options: argparse.Namespace) -> tuple[dict, dict | 
         value = getattr(options, name, None)
         if value is not None:
             config[name] = portable_path(project, resolve_path(project, value))
-    for name in ('mode', 'port', 'start_path'):
+    for name in ('mode', 'port', 'bind', 'start_path'):
         value = getattr(options, name, None)
         if value is not None:
             config[name] = value
@@ -358,6 +358,7 @@ def main(argv=None) -> int:
             sub.add_argument('--port', type=int)
         if action == 'install':
             sub.add_argument('--mode', choices=('editable', 'wheel'))
+            sub.add_argument('--bind', help='IP address to listen on (default 127.0.0.1; no authentication)')
             sub.add_argument('--host', choices=(*HOSTS, 'none'), action='append')
             sub.add_argument('--principles', choices=('shared', 'none'))
             for flag in ('environment', 'db', 'notes', 'process-record', 'start-path'):
