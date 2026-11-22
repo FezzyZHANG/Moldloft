@@ -791,6 +791,19 @@ body.resizing {
 .graph-node.status-done > .node-accent { fill: var(--struct); }
 .graph-node.status-closed > .node-accent { fill: var(--muted); }
 
+/* Ready = open with no unfinished blocker: lift it with a hard offset shadow plus attention glow. */
+.graph-node.is-ready > .node-surface {
+  stroke: var(--attn-soft);
+  stroke-width: 1.6;
+  filter: drop-shadow(5px 5px 0 var(--attn-glow)) drop-shadow(0 0 12px var(--attn-glow))
+    drop-shadow(0 4px 8px rgba(0, 0, 0, .38));
+}
+
+.graph-node.is-ready:hover > .node-surface {
+  filter: drop-shadow(6px 6px 0 var(--attn-glow)) drop-shadow(0 0 18px var(--attn-glow))
+    drop-shadow(0 6px 12px rgba(0, 0, 0, .42));
+}
+
 .graph-node.note > .node-surface {
   stroke: var(--info);
 }
