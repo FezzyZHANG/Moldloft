@@ -83,7 +83,10 @@ export class AnchorPanel {
       const {suggestions} = await api(`${graphPath(this.store.graph.id)}/anchor-suggestions?${query}`);
       for (const suggestion of suggestions) {
         const open = () => this.actions.run(() => this.actions.guard(() => this.add(target, suggestion)));
-        chips.append(button(`+ ${suggestion.repo}:${suggestion.path}`, open));
+        const span = suggestion.start_line
+          ? `:${suggestion.start_line}${suggestion.end_line && suggestion.end_line !== suggestion.start_line ? `-${suggestion.end_line}` : ''}`
+          : '';
+        chips.append(button(`+ ${suggestion.repo}:${suggestion.path}${span}`, open));
       }
     } catch (error) {
       chips.textContent = error.message;

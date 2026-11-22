@@ -77,7 +77,7 @@ export class Sidebar {
       this.graphSelect.value = store.graph?.id || '';
       run(() => actions.openGraph(id));
     });
-    options(this.status, [['', '全部状态'], ['active', '未完成 (待处理 + 进行中)'], ['ready', '可立即执行 (Ready)'], ...statuses]);
+    options(this.status, [['', '全部状态'], ['active', '未完成'], ['ready', '可执行'], ...statuses]);
     this.status.addEventListener('change', () => store.updateView({status: this.status.value}));
     this.group.addEventListener('change', () => store.updateView({group: this.group.value}));
     this.search.addEventListener('input', () => store.updateView({search: this.search.value}));

@@ -278,24 +278,30 @@ pre {
   border-bottom: 1px solid var(--rule2);
 }
 
-.nav-search,
+.nav-search {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+}
+
 .nav-filters {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 5px;
 }
 
-.nav-filters {
-  grid-template-columns: 3fr 2fr;
-}
-
 .nav-filters select {
+  width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
   text-overflow: ellipsis;
   font-size: 12px;
 }
 
 .segmented {
-  display: inline-flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
 }
 
 .segmented button + button {
@@ -385,9 +391,10 @@ pre {
 
 .item-id,
 .item-detail {
+  flex-shrink: 0;
+  white-space: nowrap;
   color: var(--ink2);
   font-size: 11px;
-  overflow-wrap: anywhere;
 }
 
 .item-detail {
@@ -798,6 +805,8 @@ pre {
 
 .relation-row .danger {
   margin-left: auto;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 button.text-link {
@@ -914,7 +923,8 @@ details[open] > summary {
 .markdown h6 { font-size: 13px; }
 
 .markdown p {
-  white-space: pre-wrap;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 
 .markdown ul {

@@ -29,7 +29,7 @@ export function markdown(text, navigate) {
   function flush() {
     if (!paragraph.length) return;
     const node = document.createElement('p');
-    inline(node, paragraph.join('\n'), navigate);
+    inline(node, paragraph.map(part => part.trim()).join(' '), navigate);
     preview.append(node);
     paragraph = [];
   }

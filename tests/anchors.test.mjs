@@ -48,7 +48,7 @@ test('suggestion chips open a prefilled file dialog and only submit pins the tar
   panel.render(target);
   await setImmediate();
   const [chip] = section.children.at(-1).children;
-  assert.equal(chip.textContent, '+ docs:guide.md');
+  assert.equal(chip.textContent, '+ docs:guide.md:2-4');
   chip.dispatchEvent(new Event('click'));
   assert.equal(dialog.open, true);
   const fields = ['repo', 'kind', 'ref', 'path', 'start_line', 'end_line'];
