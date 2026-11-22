@@ -6,6 +6,7 @@ from unittest.mock import AsyncMock, patch
 
 from fastapi.testclient import TestClient
 
+from moldloft import __version__
 from moldloft.app import _events, create_app
 from moldloft.mcp_server import MAX_BYTES
 from tests import StoreCase
@@ -40,6 +41,9 @@ class ApiTests(StoreCase):
         self.assertFalse(out.get("isError"), out)
         self.assertLessEqual(len(json.dumps(out, ensure_ascii=False).encode("utf-8")), MAX_BYTES)
         return json.loads(out["content"][0]["text"])
+
+    def test_openapi_reports_package_version(self):
+        self.assertEqual(self.api("GET", "/openapi.json")["info"]["version"], __version__)
 
     def test_graph_and_item_routes(self):
         other = "/api/graphs/other"

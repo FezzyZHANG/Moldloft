@@ -67,8 +67,10 @@ See the [SVG drawing code](src/moldloft/static/canvas.js).
 
 Each rendered edge receives a `userSpaceOnUse` SVG linear gradient from its
 source node's accent tone (ticket state or note kind) to its target node's
-accent tone, and its end marker matches the target tone. Hovering an edge turns
-both stroke and marker to `--attn`; proposal-removed edges stay `--danger`.
+accent tone. Filled arrowheads and open markers share the line's gradient through
+SVG `context-stroke`. Browsers without context paint use the target accent for the
+marker. Hover turns the line and marker to `--attn`. Removed edges keep `--danger`
+on hover.
 Markers use a 10 × 10 viewBox, a 7 × 7 marker size and reference point (9, 5).
 They appear on terminal route sections. Open markers use a 1.85-unit stroke
 with round caps and joins. A transparent 12-unit stroke gives

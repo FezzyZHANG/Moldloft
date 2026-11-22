@@ -13,6 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 
+from . import __version__
 from .config import resolve_repo_configs
 from .errors import DomainError
 from .git_truth import GitTruth
@@ -124,7 +125,7 @@ def create_app(db_path=None, *, repos=None, allowed_hosts=None) -> FastAPI:
         async with app.state.mcp.session_manager.run():
             yield
 
-    app = FastAPI(title="Moldloft", lifespan=lifespan)
+    app = FastAPI(title="Moldloft", version=__version__, lifespan=lifespan)
     state = app.state
 
     @app.middleware("http")

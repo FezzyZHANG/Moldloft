@@ -936,10 +936,13 @@ body.resizing {
   stroke-width: 3.2;
 }
 
-.edge.requires:hover path.edge-main[marker-end] { marker-end: url(#arrow-requires-attn); }
-.edge.supports:hover path.edge-main[marker-end] { marker-end: url(#arrow-supports-attn); }
-.edge.assumes:hover path.edge-main[marker-end] { marker-end: url(#arrow-assumes-attn); }
-.edge.challenges:hover path.edge-main[marker-end] { marker-end: url(#arrow-challenges-attn); }
+/* Older SVG renderers use a solid marker matching the endpoint or hover color. */
+@supports not (fill: context-stroke) {
+  .edge.requires:not(.removed):hover path.edge-main[marker-end] { marker-end: url(#arrow-requires-attn); }
+  .edge.supports:not(.removed):hover path.edge-main[marker-end] { marker-end: url(#arrow-supports-attn); }
+  .edge.assumes:not(.removed):hover path.edge-main[marker-end] { marker-end: url(#arrow-assumes-attn); }
+  .edge.challenges:not(.removed):hover path.edge-main[marker-end] { marker-end: url(#arrow-challenges-attn); }
+}
 
 .edge.assumes path.edge-main {
   stroke-width: 2;
@@ -984,12 +987,14 @@ body.resizing {
 
 .arrow {
   fill: var(--edge);
+  fill: context-stroke;
 }
 
 .arrow.assumes,
 .arrow.challenges {
   fill: none;
   stroke: var(--edge);
+  stroke: context-stroke;
   stroke-width: 1.85;
   stroke-linecap: round;
   stroke-linejoin: round;

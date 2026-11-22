@@ -2,6 +2,8 @@
 
 ## 0.3.0a1 — Moldloft v2 (`refactor/v2-clean`)
 
+- The OpenAPI document and distribution metadata read the release version from
+  `moldloft.__version__`.
 - **Workspace.** One SQLite database (schema version 1, WAL, foreign keys and
   FTS5) holds multiple graphs. Ticket containment and dependencies are
   independent DAGs. Only `done` satisfies a blocker. A ticket subtree can move
@@ -25,6 +27,7 @@
 - **Workbench.** The zero-build browser uses vanilla ES modules and a vendored
   elkjs 0.12.0 layout worker. Three themes share six color roles. Ready tickets
   have an offset shadow and glow, notes have dashed parallelogram accents, and
-  evidence links use distinct strokes and markers. The navigator and inspector
+  evidence links use distinct strokes and markers. Lines and arrowheads share
+  a gradient between the two cards' accents. The navigator and inspector
   resize and collapse. The command palette reveals items, and the inspector
   renders Markdown and saves after IME composition. [Workbench design](DESIGN.md)
