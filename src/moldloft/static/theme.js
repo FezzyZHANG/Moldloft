@@ -2,6 +2,7 @@
 const STORAGE_KEY = 'moldloft.theme.v1';
 export const THEMES = Object.freeze([
   {id: 'endfield', label: '终末地 · Endfield'},
+  {id: 'monokai', label: 'Monokai'},
   {id: 'loft', label: '放样间 · Loft'},
 ]);
 export const DEFAULT_THEME = 'endfield';

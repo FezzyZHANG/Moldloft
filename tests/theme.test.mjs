@@ -25,6 +25,8 @@ test('loadTheme defaults to endfield and ignores unknown or failing storage', ()
   assert.equal(loadTheme(storage), 'endfield');
   storage.setItem('moldloft.theme.v1', 'loft');
   assert.equal(loadTheme(storage), 'loft');
+  storage.setItem('moldloft.theme.v1', 'monokai');
+  assert.equal(loadTheme(storage), 'monokai');
   storage.setItem('moldloft.theme.v1', 'unknown-theme');
   assert.equal(loadTheme(storage), 'endfield');
   const broken = {getItem() { throw new Error('denied'); }, setItem() { throw new Error('denied'); }};
@@ -36,6 +38,8 @@ test('applyTheme validates theme IDs and writes dataset.theme', () => {
   const root = {dataset: {}};
   assert.equal(applyTheme('loft', root), 'loft');
   assert.equal(root.dataset.theme, 'loft');
+  assert.equal(applyTheme('monokai', root), 'monokai');
+  assert.equal(root.dataset.theme, 'monokai');
   assert.equal(applyTheme('bogus', root), 'endfield');
   assert.equal(root.dataset.theme, 'endfield');
 });

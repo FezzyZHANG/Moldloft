@@ -33,10 +33,16 @@ export class Canvas {
     this.empty = byId('canvas-empty');
     this.layer = svg('g');
     const defs = svg('defs');
-    for (const type of Object.keys(relationLabels).filter(type => type !== 'relates')) {
+    const markerShapes = {
+      requires: 'M0 1 L10 5 L0 9 z',
+      supports: 'M0 1 L10 5 L0 9 z',
+      assumes: 'M1 1 L9 5 L1 9',
+      challenges: 'M8 1 L8 9 M0 5 L8 5',
+    };
+    for (const [type, d] of Object.entries(markerShapes)) {
       const marker = svg('marker', {id: `arrow-${type}`, viewBox: '0 0 10 10', refX: 9, refY: 5,
         markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse'});
-      marker.append(svg('path', {d: 'M0 1 L10 5 L0 9 z', class: `arrow ${type}`}));
+      marker.append(svg('path', {d, class: `arrow ${type}`}));
       defs.append(marker);
     }
     this.svg.append(defs, this.layer);
@@ -256,7 +262,8 @@ export class Canvas {
         const d = points.map(({x, y}, i) => `${i ? 'L' : 'M'}${x},${y}`).join(' ');
         group.append(
           svg('path', {d, class: 'edge-hit'}),
-          svg('path', {d, ...(!section.outgoingSections?.length ? outgoing : {})}),
+          svg('path', {d, class: 'edge-main', ...(!section.outgoingSections?.length ? outgoing : {})}),
+          ...(type === 'supports' ? [svg('path', {d, class: 'edge-core'})] : []),
         );
       }
       group.addEventListener('click', event => {
