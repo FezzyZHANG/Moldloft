@@ -52,6 +52,9 @@ export class Palette {
         `graph:${graph.id}`, `切换到 ${graph.name}`, 'Switch Graph', () => actions.openGraph(graph.id),
       ]);
     }
+    for (const theme of actions.themes || []) {
+      rows.push([`theme:${theme.id}`, `切换主题：${theme.label}`, 'Switch Theme', () => actions.setTheme?.(theme.id)]);
+    }
     return rows.map(([key, title, detail, action]) => ({key, title, detail, action}));
   }
 

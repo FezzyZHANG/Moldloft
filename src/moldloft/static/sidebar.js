@@ -125,16 +125,43 @@ export class Sidebar {
     byId('delete-graph').disabled = !graph || graph.id === 'default';
   }
 
-  itemButton(type, row, detail = '') {
+  itemButton(type, row, {table = false} = {}) {
     const {selection} = this.store;
     const key = targetName(type, row.id);
     const active = selection?.id === row.id && selection.type === type;
-    const node = button(row.title, () => this.actions.pickNode(type, row.id), {
-      className: 'item-button', 'aria-current': active ? 'true' : null, title: row.title,
-      'data-item': `${type}:${row.id}`,
+    if (table) {
+      const node = button(row.title, () => this.actions.pickNode(type, row.id), {
+        className: 'item-button', 'aria-current': active ? 'true' : null, title: `${row.title} (${key})`,
+        'data-item': `${type}:${row.id}`,
+      });
+      node.prepend(element('span', {className: 'item-id', text: key}));
+      return node;
+    }
+    if (type === 'ticket') {
+      const status = statusText.get(row.status) || row.status;
+      const node = button(null, () => this.actions.pickNode(type, row.id), {
+        className: 'item-button ticket-item', 'aria-current': active ? 'true' : null,
+        title: `${row.title} (${key} · ${status})`, 'data-item': `${type}:${row.id}`,
+      });
+      node.append(
+        element('span', {className: 'item-lead'},
+          element('span', {className: 'item-id', text: key}),
+          element('span', {className: `item-status status-${row.status}`, text: status})),
+        element('span', {className: 'item-title', text: row.title}),
+      );
+      return node;
+    }
+    const node = button(null, () => this.actions.pickNode(type, row.id), {
+      className: 'item-button note-item', 'aria-current': active ? 'true' : null,
+      title: `${row.title} (${key})`, 'data-item': `${type}:${row.id}`,
     });
-    node.prepend(element('span', {className: 'item-id', text: key}));
-    if (detail) node.append(element('span', {className: 'item-detail', text: detail}));
+    node.append(
+      element('span', {className: 'item-title', text: row.title}),
+      element('span', {className: 'item-id', text: key, title: key}),
+      element('span', {className: 'item-note-meta'},
+        element('span', {className: `item-state state-${row.state}`, text: row.state}),
+        element('span', {className: `item-kind kind-${row.kind}`, text: row.kind})),
+    );
     return node;
   }
 
@@ -183,7 +210,7 @@ export class Sidebar {
       }) : [empty('没有符合条件的工单')]));
     for (const [id, active] of [['note-list', true], ['reference-list', false]]) {
       const rows = notes.filter(row => row.in_graph === active);
-      byId(id).replaceChildren(...(rows.length ? rows.map(row => this.itemButton('note', row, row.kind)) :
+      byId(id).replaceChildren(...(rows.length ? rows.map(row => this.itemButton('note', row)) :
         [empty('没有符合条件的笔记')]));
     }
     byId('proposal-list').replaceChildren(...(proposals.length ? proposals.map(proposal =>
@@ -213,6 +240,6 @@ export class Sidebar {
       element('thead', {}, element('tr', {}, ...['项目', '状态', '优先级 / 类型', '分组 / 位置']
         .map(text => element('th', {scope: 'col', text})))),
       element('tbody', {}, ...rows.map(([type, row, ...columns]) => element('tr', {},
-        element('td', {}, this.itemButton(type, row)), ...columns.map(text => element('td', {text})))))));
+        element('td', {}, this.itemButton(type, row, {table: true})), ...columns.map(text => element('td', {text})))))));
   }
 }

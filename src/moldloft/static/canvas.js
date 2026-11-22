@@ -282,23 +282,30 @@ export class Canvas {
     const width = item ? Math.min(244, node.width) : node.width;
     const height = item ? 114 : collapsed ? 60 : 42;
     const caption = item?.title ?? data.label;
-    const classes = ['graph-node', ticket ? 'ticket' : note ? 'note' : 'group', item?._proposal,
-      selected === node.id ? 'selected' : '', connect?.key === node.id ? 'connect-source' : ''].filter(Boolean);
+    const classes = [
+      'graph-node', ticket ? 'ticket' : note ? 'note' : 'group', item?._proposal,
+      ticket ? `status-${ticket.status}` : '', ticket?.ready ? 'is-ready' : '',
+      ticket?.blockers?.length ? 'is-blocked' : '',
+      ticket && ['done', 'closed'].includes(ticket.status) ? 'is-terminal' : '',
+      note ? `kind-${note.kind}` : '', note ? `state-${note.state}` : '',
+      selected === node.id ? 'selected' : '', connect?.key === node.id ? 'connect-source' : '',
+    ].filter(Boolean);
     const card = svg('g', {class: classes.join(' '), transform: `translate(${x} ${y})`,
       'data-node': node.id, tabindex: 0, role: 'button', 'aria-label': caption});
     const toggle = () => this.actions.collapse(node.id);
     const activate = () => item ? this.actions.pickNode(ticket ? 'ticket' : 'note', item.id) : toggle();
     card.append(svg('title', {}, caption), svg('rect', {class: 'node-surface', width, height}));
     if (item) {
+      card.append(svg('rect', {class: 'node-accent', x: 0, y: 0, width: 4, height}));
       if (typeof item.id !== 'number' && ticket && item.id.startsWith('new:')) card.classList.add('preview-item');
       const label = ticket ? `#${item.id}  /  ${item.status}` : `${item.kind}  /  ${item.state}`;
-      card.append(svg('text', {x: 12, y: 19, class: 'node-meta'}, label));
+      card.append(svg('text', {x: 14, y: 19, class: 'node-meta'}, label));
     }
     this.context.font = '600 14px system-ui, sans-serif';
-    const lines = wrapText(caption, width - (hasChildren ? 58 : 27),
+    const lines = wrapText(caption, width - (hasChildren ? 60 : 29),
       text => this.context.measureText(text).width, item ? 2 : 1);
     lines.forEach((line, i) => card.append(svg('text', {
-      class: 'node-title', x: 12, y: (item ? 41 : 25) + 17 * i,
+      class: 'node-title', x: item ? 14 : 12, y: (item ? 41 : 25) + 17 * i,
     }, line)));
     const count = ticket?.blockers?.length || 0;
     const premise = ticket?.review_notes?.length || note?.adoption_stale;
@@ -339,7 +346,7 @@ export class Canvas {
 
   badges(card, y, values) {
     this.context.font = '11px system-ui, sans-serif';
-    let x = 12;
+    let x = 14;
     for (const [style, label] of values) {
       if (!label) continue;
       const width = Math.ceil(this.context.measureText(label).width) + 10;

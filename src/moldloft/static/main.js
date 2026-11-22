@@ -6,6 +6,7 @@ import {PaneLayout} from './panes.js';
 import {Review} from './review.js';
 import {Sidebar} from './sidebar.js';
 import {findItem, readTarget, targetParam, WorkbenchStore} from './store.js';
+import {ThemeManager, THEMES} from './theme.js';
 import {button, byId} from './ui.js';
 
 function report(error) {
@@ -37,6 +38,9 @@ const actions = {
 const sidebar = new Sidebar(store, actions);
 const inspector = new Inspector(store, actions);
 const review = new Review(store, actions);
+const theme = new ThemeManager(byId('theme-select'));
+actions.themes = THEMES;
+actions.setTheme = id => theme.set(id);
 const canvas = new Canvas(actions);
 new Palette(store, actions);
 new PaneLayout(document.querySelector('.workspace'), {
