@@ -1,8 +1,10 @@
 # Moldloft v2 architecture
 
-The browser API, CLI and MCP server use the same Python `Store` and SQLite
-workspace format. `__main__.py` selects the entry point. `config.py` resolves the database
-and the named Git checkouts. FastAPI serves the packaged web assets and HTTP API.
+The browser API, CLI and MCP server share one SQLite workspace. Under
+`src/moldloft/`, `__main__.py` selects the CLI entry point and `config.py`
+resolves the database and named Git checkouts. FastAPI's `app.py` serves the
+workbench at `/` and packaged assets under `/static`. Setup and command examples
+are in the [user guide](README.md).
 
 ## Persistence and identity
 
@@ -15,23 +17,26 @@ and initialization enables WAL. Each graph snapshot reads from one transaction.
 | `graphs` | Stable ID, display name, revision and timestamps |
 | `tickets` | Global integer ID, graph, authored fields, status, priority, parent and version |
 | `ticket_edges` | Unique directed pair of blocker and blocked ticket IDs |
-| `notes` | Global `n-…` ID, graph, kind, state, summary, body, visibility and adoption hash |
+| `notes` | Global `n-…` ID, graph, title, kind, state, summary, body, visibility, adoption hash and version |
 | `note_links` | Source note, relation and typed ticket or note target |
 | `anchors` | Target, authored Git coordinates and evidence captured at pin time |
 | `proposals` | Submitted batch, base revision, review decision and application result |
 | `search_fts` | FTS5 index of ticket and note text with graph, type and item ID |
 
-`store.py` persists row changes and updates the search index in the same
-`BEGIN IMMEDIATE` transaction. Readers can search by full-text prefix, literal
-substring or item ID. Import and migration rebuild the index from the base rows.
+`store.py` persists item changes and updates the search index in the same
+`BEGIN IMMEDIATE` transaction. FTS columns `title`, `summary` and `body` index
+ticket titles, descriptions and technical notes, or the corresponding note
+fields. Search combines prefix, literal substring and exact ID matches.
+Import and migration rebuild the index from the base rows.
 
 ## Graph reduction
 
-`reduce_graph(before, operations)` takes a snapshot and a batch of 1–100
+`reducer.py` implements `reduce_graph(before, operations)` for batches of 1–100
 operations. It returns normalized operations, an enriched preview and field-level
 changes. Symbolic ticket IDs such as `new:review` let later operations in the
-batch reference a new ticket. Persistence allocates real IDs and translates the
-references once. A failed operation rolls back the batch.
+batch reference a new ticket. The store resolves new or updated Git pins in
+the preview. On apply, persistence allocates real IDs and translates their
+references in parents, edges, links and anchors.
 
 | Relationship | Invariant and effect |
 | --- | --- |
@@ -45,67 +50,70 @@ stops at off-graph notes and tracks visited items. An adopted assumption stores
 the SHA-256 of its title and body encoded as a compact UTF-8 JSON array.
 A changed digest or an unadopted premise raises a review hint.
 
-Row versions protect item edits. Structural operations can also require the graph
-revision. A ticket move includes its descendants and their anchors, rejects a
-dependency crossing the move boundary and removes incoming note links to moved
-tickets. Both graphs receive a new revision.
+Direct ticket and note PATCH requests require the item's `version`. Changing a
+ticket's parent or group also requires the graph's `revision`. Deleting a ticket
+reparents its children to its former parent. A cross-graph move detaches the
+moved root and takes its descendants and their anchors. A dependency crossing
+the move boundary blocks the move. A successful move drops incoming note links
+to moved tickets and increments both graph revisions in one transaction.
 
 ## Git evidence
 
-`git_truth.py` resolves only configured checkouts. `GitTruth.pin` resolves the
-requested ref, records the commit SHA and reads the Git object. File anchors pin
-a tracked UTF-8 regular file and a 1-based inclusive span. The hash covers all
-selected text including line endings. The saved excerpt is capped at 4,000
-characters. A symbol and claim explain what the author saw in that span.
+`git_truth.py` reads objects from configured checkouts. `GitTruth.pin` records
+`pinned_sha` for every kind. File and commit anchors also store the resolved
+SHA in `ref`. Branch anchors keep the local branch name in `ref`. A file's
+`content_hash` is SHA-256 over the entire selected span, including line
+endings. For commits and branches it is the commit SHA. The excerpt holds
+selected text or the commit date and subject, capped at 4,000 characters.
 
-| Verification result | Comparison |
-| --- | --- |
-| `fresh` | File hash matches at the saved range, branch tip matches, or pinned commit remains an ancestor of HEAD |
-| `moved` | The original lines match elsewhere in the same file at HEAD. A suggested pin includes the new range. |
-| `drifted` | File content, branch tip or commit ancestry changed. File results can include a bounded unified diff. |
-| `dirty` | The committed evidence passes and tracked changes exist in the relevant working-tree or index scope. |
-| `missing` | Required repository, ref, file or pin cannot be read or verified. |
+File verification compares the hash at the saved range against HEAD. If it
+differs, the verifier reads the original lines from the pinned commit and
+looks for their first exact match elsewhere in the same path. A match yields
+`moved` with a suggested SHA and range. A changed span yields `drifted` with
+a unified diff capped at 120 output lines of up to 500 characters each.
+Branch verification compares the named local tip to the pin. Commit
+verification checks whether the pin is an ancestor of HEAD.
 
-Verification returns diagnostics and leaves the saved row intact. An explicit
-re-anchor operation captures a new baseline. Migrated links with unavailable
-evidence retain their legacy ref and have empty hash, excerpt and verification time.
+Tracked index or working-tree changes yield `dirty` when the committed evidence
+is fresh. File anchors scope that check to their path, and commit and branch
+anchors check the whole checkout. `working_dirty` can accompany another status.
+Verification leaves the saved row intact. The [user guide](README.md#verify-a-claim-against-git)
+lists all five results and shows how to re-anchor.
 
 ## Human review and MCP
 
-`app.py` serves human edit and review endpoints. `mcp_server.py` serves Streamable
-HTTP at `/mcp` and stdio via `moldloft mcp`. Both transports expose the same tools.
-
-- `list_graphs`, `get_ready_work`, `get_item` and `search` locate work and context.
-- `verify_ground_truth` compares anchors using the configured checkouts.
-- `propose_changes` records a pending batch. `get_proposal` returns its decision.
-
-Bounded MCP reads carry a `truncated` flag. Submission checks the base revision
-and validates the preview. An optional request ID makes a repeated submission
-idempotent. The reviewer sees a graph overlay and field diffs, can amend proposed
-text and can approve or reject. Approval rechecks preconditions and commits the
-changes and decision together. A structural proposal needs its original graph
-revision. Independent field edits can survive unrelated revisions if their item
-versions still match.
+`mcp_server.py` exposes the same reads and proposal submission over Streamable
+HTTP at `/mcp` and stdio. The store validates a new submission against the
+current graph revision and stores the original operations. Inspection computes
+a fresh preview and field diffs. The browser's human review endpoints are
+`POST /api/proposals/{proposal_id}/apply` and `POST /api/proposals/{proposal_id}/reject`.
+Approval checks preconditions, validates amendments, resolves pins again and
+commits the graph and decision together. For exact version checks, retries and
+result keys, see the [MCP reference](MCP.md#submission-review-and-conflicts).
 
 ## Portable Markdown and YAML
 
 `markdown_io.py` powers both `edit` and offline workspace exchange. An export
-reads one snapshot and publishes the manifest last. Each graph has a directory in the archive.
+reads one SQLite snapshot and publishes the manifest last. For example, the
+default graph can produce these files.
 
 ```text
 manifest.yaml                      # format version 1, graphs, ID sequences
-graphs/<graph>/tickets/0001.md     # identity and fields, description, technical notes
-graphs/<graph>/notes/n-window.md   # identity and fields, outgoing links, Markdown body
-graphs/<graph>/edges.yaml          # [blocker_id, blocked_id] pairs
-graphs/<graph>/anchors.yaml        # saved pins, hashes and excerpts
-graphs/<graph>/proposals.yaml      # review records and decisions
+graphs/default/tickets/0001.md     # identity and fields, description, technical notes
+graphs/default/notes/n-window.md   # identity and fields, outgoing links, Markdown body
+graphs/default/edges.yaml          # [blocker_id, blocked_id] pairs
+graphs/default/anchors.yaml        # saved pins, hashes and excerpts
+graphs/default/proposals.yaml      # review records and decisions
 ```
 
-UTF-8 Markdown files start with YAML frontmatter. A reserved comment separates
-ticket description from technical notes. Escaping preserves literal separators
-and carriage returns. Import validates identities, both DAGs, typed relations and
-pins before restoring rows, sequences and FTS in a transaction. `edit` checks the
-original item identity and version and retains the file when saving fails.
+Graph directory names normally use the graph ID. Unsafe or colliding names use
+a tilde and a SHA-256 digest. UTF-8 Markdown files start with YAML frontmatter.
+The line `<!-- moldloft:tech_notes -->` separates ticket description from
+technical notes. Escaping preserves literal separators and carriage returns.
+Import checks identities, both DAGs, typed relations and stored pin metadata
+offline, then restores rows, ID sequences and FTS in a transaction. `edit`
+checks the original item identity and version and retains the temporary file
+when saving fails.
 
 ## Zero-build browser
 
@@ -117,12 +125,15 @@ original item identity and version and retains the file when saving fails.
 | --- | --- |
 | `main.js`, `store.js` | Selection, URL navigation, API calls, graph snapshots and revision events |
 | `sidebar.js`, `palette.js` | Graph navigation, lists, search and keyboard commands |
+| `panes.js`, `theme.js` | Pane sizes, visibility and theme preferences in browser local storage |
 | `layout.js`, `compact-layered.js`, `text-layout.js` | Graph projection, ELK layout and label wrapping |
-| `canvas.js` | SVG rendering, pan, zoom and selection |
+| `canvas.js` | SVG cards and edges, pan, zoom, selection and reveal |
 | `inspector.js`, `draft.js` | Versioned field edits, IME-aware saves and visible conflict handling |
-| `anchors.js`, `review.js` | Pin inspection, verification, proposal preview and decisions |
-| `markdown.js`, `ui.js` | Markdown rendering with text nodes and shared DOM helpers |
+| `anchors.js`, `review.js` | Pin inspection, suggestions, verification, proposal preview and decisions |
+| `markdown.js`, `ui.js` | DOM-only rich Markdown rendering and shared DOM helpers |
 
-Server-sent events carry the graph revision and pending-proposal signature.
-The browser refreshes snapshots as these change and polls if the event stream
-disconnects. Draft state survives refreshes while the user resolves a conflict.
+`GET /api/graphs/{graph_id}/events` emits a `revision` event with `revision`
+and `pending_sig` (a digest of sorted pending proposal IDs). Either can trigger
+a snapshot refresh. The browser polls every five seconds while the event
+stream is disconnected. Drafts survive snapshot refreshes. For controls, visual
+encodings and save behavior, see [Workbench design](DESIGN.md).
