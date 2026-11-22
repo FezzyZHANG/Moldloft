@@ -1,4 +1,4 @@
-import {api, graphPath} from './store.js';
+import {api, findItem, graphPath} from './store.js';
 import {bindForm, button, byId, diffBlock, element, options, showDialog} from './ui.js';
 
 export class AnchorPanel {
@@ -30,15 +30,19 @@ export class AnchorPanel {
     this.controls.namedItem('kind').addEventListener('change', () => void this.refreshRefs());
   }
 
-  async add(target) {
-    const graphId = this.store.graph.id;
-    const {repos} = await api('/api/git/repos');
+  add(target, suggestion) {
+    const {id: graphId, repos} = this.store.graph;
     const selected = this.store.selection;
-    if (this.store.graph.id !== graphId || selected?.id !== target.id || selected.type !== target.type) return;
+    if (selected?.id !== target.id || selected.type !== target.type) return;
     if (!repos.length) throw new Error('没有已配置的 Git 仓库');
     this.context = {target, graphId};
     this.dialog.querySelector('form').reset();
-    options(this.controls.namedItem('repo'), repos.map(repo => [repo, repo]));
+    options(this.controls.namedItem('repo'), repos.map(repo => [repo, repo]), suggestion?.repo);
+    if (suggestion) {
+      for (const name of ['path', 'start_line', 'end_line']) {
+        this.controls.namedItem(name).value = suggestion[name] ?? '';
+      }
+    }
     showDialog(this.dialog);
     void this.refreshRefs();
   }
@@ -70,6 +74,19 @@ export class AnchorPanel {
       message.textContent = `HEAD ${head.slice(0, 12)} · ${branches.length} 个分支 · ${commits.length} 条近期提交`;
     } catch (error) {
       if (request === this.request) message.textContent = error.message;
+    }
+  }
+
+  async loadSuggestions(target, chips) {
+    const query = new URLSearchParams({target: target.id});
+    try {
+      const {suggestions} = await api(`${graphPath(this.store.graph.id)}/anchor-suggestions?${query}`);
+      for (const suggestion of suggestions) {
+        const open = () => this.actions.run(() => this.actions.guard(() => this.add(target, suggestion)));
+        chips.append(button(`+ ${suggestion.repo}:${suggestion.path}`, open));
+      }
+    } catch (error) {
+      chips.textContent = error.message;
     }
   }
 
@@ -123,5 +140,14 @@ export class AnchorPanel {
     section.replaceChildren(title, ...rows);
     if (!rows.length) section.append(element('p', {className: 'empty',
       text: store.graph.repos.length ? '暂无代码锚点' : '暂无代码锚点 · 当前未配置 Git 仓库'}));
+    if (store.graph.repos.length) {
+      const item = findItem(store.graph, target);
+      if (this.suggestedFor !== item) {
+        this.suggestedFor = item;
+        this.chips = element('div', {className: 'anchor-suggestions'});
+        void this.loadSuggestions(target, this.chips);
+      }
+      section.append(this.chips);
+    }
   }
 }

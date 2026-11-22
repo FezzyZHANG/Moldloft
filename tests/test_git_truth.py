@@ -131,6 +131,90 @@ class GitTests(StoreCase):
         with self.assertRaises(DomainError):
             GitTruth({"nested": subdir}).refs("nested")
 
+    def test_exclusions_are_repo_relative_case_insensitive_and_segment_bounded(self):
+        names = ["Docs/hidden.md", "private/nested.txt", "draft.md", "draft.md.bak", "Docs2/ok.md"]
+        for name in names:
+            path = self.repo / name
+            path.parent.mkdir(exist_ok=True)
+            path.write_text("tracked", encoding="utf-8")
+        self.commit("documents")
+        truth = GitTruth({"fixture": {"path": self.repo, "exclude": ["dOcS/", "PRIVATE"]}, "other": self.repo},
+                         excludes={"fixture": ("DRAFT.md",)})
+        for path in names[:3]:
+            spec = dict(repo="fixture", kind="file", path=path)
+            with self.subTest(path=path), self.assertRaisesRegex(DomainError, "excluded"):
+                truth.pin(spec)
+            pin = truth.pin(dict(spec, repo="other"))
+            result = truth.verify(dict(pin, repo="fixture"))
+            self.assertEqual(result["status"], "missing")
+            self.assertIn("excluded", result["message"])
+        suggested = truth.suggest_paths(" ".join(names))
+        self.assertEqual([(s["repo"], s["path"]) for s in suggested],
+                         [("fixture", n) for n in names[3:]] + [("other", n) for n in names])
+
+    def test_markdown_suggestions_use_regular_utf8_head_blobs_and_valid_ranges(self):
+        for name, data in (("entry.py", b"1\n2\n3"), ("binary.md", b"a\0b"), ("other.md", b"\xff"),
+                           (".env.local", b"secret"), ("large.md", b"z" * 500_001)):
+            (self.repo / name).write_bytes(data)
+        self.commit("candidate paths")
+        oid = self.git("hash-object", "-w", "--stdin", data=b"entry.py")
+        self.git("update-index", "--add", "--cacheinfo", f"120000,{oid},pointer.md")
+        self.git("commit", "-m", "symlink")
+        (self.repo / "loose.md").write_bytes(b"untracked")
+        (self.repo / "entry.py").unlink()
+        self.file.write_bytes(b"shorter in checkout")
+        before = (self.repo / ".git" / "index").read_bytes()
+        text = ("Review [the file](<read me.txt:2-3>) and ./entry.py:3. Also `read me.txt`, entry.py:1, "
+                "binary.md other.md .env.local large.md pointer.md loose.md missing.md")
+        self.assertEqual(self.truth.suggest_paths(text), [
+            dict(repo="fixture", path=self.file.name, start_line=2, end_line=3),
+            dict(repo="fixture", path="entry.py", start_line=3, end_line=3)])
+        self.assertEqual(self.truth.suggest_paths("../entry.py /entry.py https://host/entry.py entry.py:4 "
+                                                 "entry.py:0 entry.py:3-1 entry.py:1-501"), [])
+        self.assertEqual(before, (self.repo / ".git" / "index").read_bytes())
+
+    def test_suggestions_cap_per_item_after_excluding_existing_pins(self):
+        names = [f"file-{i}.md" for i in range(24)]
+        for name in names:
+            (self.repo / name).write_bytes(b"contents")
+        self.commit("many paths")
+        tid = self.ticket("Files", tech_notes=" ".join(names))
+        self.store.mutate([dict(op="anchor_add", target_type="ticket", target_id=tid,
+                                anchor=dict(kind="file", repo="fixture", path=name)) for name in names[:3]])
+        self.assertEqual([r["path"] for r in self.store.suggest_anchors(target=f"#{tid}")], names[3:23])
+
+    def test_bulk_suggestions_limit_work_before_git_reads(self):
+        self.store.mutate([dict(op="ticket_create", temp_id=f"new:t{i}", fields=dict(title=f"Task {i}"))
+                           for i in range(100)])
+        last = self.ticket("Last")
+        with patch.object(self.truth, "suggest_paths", return_value=[]) as suggest:
+            self.assertEqual(self.store.suggest_anchors(), [])
+            self.assertEqual(suggest.call_count, 100)
+            self.assertNotIn("Last", suggest.call_args.args[0])
+            self.store.suggest_anchors(target=last)
+            self.assertIn("Last", suggest.call_args.args[0])
+
+    def test_store_suggestions_scope_target_status_graph_and_existing_anchor(self):
+        mention = f"`{self.file.name}:2`"
+        first = self.ticket("Open", description=mention)
+        progress = self.ticket(mention, status="in_progress")
+        done = self.ticket("Done", tech_notes=mention, status="done")
+        self.ticket(mention, status="closed")
+        self.note("n-doc", summary=mention)
+        self.store.create_graph("Other", "other")
+        self.store.mutate([dict(op="ticket_create", temp_id="new:t", fields=dict(title=mention))], graph_id="other")
+        with self.assertRaises(DomainError):
+            self.store.suggest_anchors("other", "n-doc")
+        with self.assertRaises(DomainError):
+            self.store.suggest_anchors("missing")
+        self.store.mutate([dict(op="anchor_add", target_type="ticket", target_id=first, anchor=self.spec)])
+        before = self.store.snapshot()
+        expected = dict(repo="fixture", path=self.file.name, start_line=2, end_line=2)
+        self.assertEqual(self.store.suggest_anchors(), [dict(expected, target_type="ticket", target_id=progress)])
+        for kind, key in (("note", "n-doc"), ("ticket", done)):
+            self.assertEqual(self.store.suggest_anchors(target=key), [dict(expected, target_type=kind, target_id=key)])
+        self.assertEqual(self.store.snapshot(), before)
+
     def test_anchors_on_both_target_types_and_explicit_reanchor(self):
         tid = self.ticket("Ticket")
         self.note("n-doc")

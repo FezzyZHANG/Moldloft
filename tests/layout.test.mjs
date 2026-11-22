@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import {createRequire} from 'node:module';
 import test from 'node:test';
 import {computeLayout} from '../src/moldloft/static/compact-layered.js';
-import {groupKey, neighborhood, noteKey, previewOverlay, project, ticketKey} from '../src/moldloft/static/layout.js';
+import {filterItems, groupKey, groupValue, neighborhood, noteKey, previewOverlay, project, ticketKey} from '../src/moldloft/static/layout.js';
 import {wrapText} from '../src/moldloft/static/text-layout.js';
 
 const require = createRequire(import.meta.url);
@@ -63,6 +63,50 @@ test('projection retains hierarchy, bundles typed edges, and rolls drift up to c
   const local = flatten(project(input, new Set(), {search: '#3', showNotes: false}));
   assert.deepEqual(local.filter(n => n.data?.ticket).map(n => n.data.ticket.id), [1, 3]);
   assert.deepEqual(input, before);
+});
+
+test('status and group filters intersect with search and retain containing tickets', () => {
+  const input = graph([
+    {...ticket(1), status: 'done'}, {...ticket(2, 1), ready: true},
+    {...ticket(3, null, 'Deck'), status: 'in_progress'}, ticket(4, null, ''),
+    {...ticket(5, null, 'Deck'), status: 'closed'}, ticket(6, null, '__ungrouped__'),
+  ], []);
+  const matching = filter => filterItems(input, filter).matching.map(t => t.id);
+  assert.deepEqual(matching({status: 'active'}), [2, 3, 4, 6]);
+  assert.deepEqual(matching({status: 'ready'}), [2]);
+  assert.deepEqual(matching({status: 'open'}), [2, 4, 6]);
+  assert.deepEqual(matching({status: 'done'}), [1]);
+  assert.deepEqual(matching({status: 'in_progress'}), [3]);
+  assert.deepEqual(matching({status: 'closed'}), [5]);
+  assert.deepEqual(matching({group: 'Deck', status: 'active'}), [3]);
+  assert.deepEqual(matching({group: '__ungrouped__'}), [4]);
+  assert.deepEqual(matching({group: groupValue('__ungrouped__')}), [6]);
+  assert.deepEqual(matching({group: 'Deck', search: '#5'}), [5]);
+  const visible = flatten(project(input, new Set(), {status: 'ready', group: 'Hull'}));
+  assert.deepEqual(visible.filter(n => n.data?.ticket).map(n => n.data.ticket.id), [1, 2]);
+  assert.deepEqual(project(input, new Set(), {status: 'ready', group: 'Deck'}).children, []);
+});
+
+test('canvas and sidebar scope searchable canvas notes to included tickets outside local mode', () => {
+  const input = graph([{...ticket(1), status: 'done'}, {...ticket(2, 1), ready: true},
+    {...ticket(3, null, 'Deck'), status: 'done'}], [],
+    [note('n-child'), note('n-parent'), note('n-done'), note('n-indirect'), note('n-ref', false)], [
+      link('n-child', 'supports', 'ticket', 2), link('n-parent', 'relates', 'ticket', 1),
+      link('n-done', 'supports', 'ticket', 3), link('n-indirect', 'relates', 'note', 'n-child'),
+    ]);
+  const canvasNotes = (filter, collapsed) => flatten(project(input, collapsed, filter))
+    .filter(n => n.data?.note).map(n => n.data.note.id).sort();
+  for (const filter of [{status: 'active'}, {status: 'ready'}, {group: 'Hull'}]) {
+    assert.deepEqual(canvasNotes(filter, new Set([groupKey('Hull')])), ['n-child', 'n-parent']);
+    assert.deepEqual(filterItems(input, filter).notes.map(n => n.id), ['n-child', 'n-parent', 'n-ref']);
+  }
+  assert.deepEqual(canvasNotes({group: 'Deck'}), ['n-done']);
+  assert.deepEqual(canvasNotes({status: 'closed'}), []);
+  assert.deepEqual(canvasNotes({search: 'n-done'}), ['n-done']);
+  assert.deepEqual(canvasNotes({status: 'active', search: 'n-done'}), []);
+  assert.deepEqual(canvasNotes({status: 'ready', local: true, focus: noteKey('n-child')}), ['n-child', 'n-indirect']);
+  input.tickets[1].title = input.notes[0].title = 'Find me';
+  assert.deepEqual(canvasNotes({status: 'active', search: 'find me'}), ['n-child']);
 });
 
 test('proposal overlay consumes backend change identities and retains deletions', () => {

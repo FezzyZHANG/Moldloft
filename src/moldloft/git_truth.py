@@ -6,15 +6,31 @@ from difflib import unified_diff
 from hashlib import sha256
 from itertools import islice
 import os
-from pathlib import Path
 import re
 import subprocess
 from threading import Lock
 from time import monotonic
 
+from .config import RepoConfig
 from .errors import DomainError
 
 _REF = re.compile(r"[A-Za-z0-9_][A-Za-z0-9._/-]{0,254}\Z")
+_MENTION = re.compile(r"`([^`\r\n]+)`|\]\(<?([^()<>\r\n]+?)>?\)|([\w./\\:@~-]+)")
+
+
+def _path_mentions(text):
+    mentions = {}
+    for token in _MENTION.finditer(text):
+        value = token[1] or token[2] or token[3]
+        match = re.fullmatch(r"([^:]+)(?::([0-9]{1,9})(?:-([0-9]{1,9}))?)?", value.rstrip("."))
+        if not match:
+            continue
+        path = match[1].removeprefix("./")
+        start = int(match[2]) if match[2] else None
+        end = int(match[3]) if match[3] else start
+        if start is None or 1 <= start <= end < start + 500:
+            mentions.setdefault(path, []).append((start, end))
+    return mentions
 
 
 def safe_path(path):
@@ -121,8 +137,13 @@ def _compare_span(anchor, old, lines, head):
 
 
 class GitTruth:
-    def __init__(self, repos: dict[str, Path] | None = None):
-        self.roots = dict(repos or {})
+    def __init__(self, repos=None, excludes: dict[str, tuple[str, ...]] | None = None):
+        self.roots = {}
+        self.excludes = {}
+        for name, entry in (repos or {}).items():
+            config = RepoConfig.parse(name, entry, (excludes or {}).get(name, ()))
+            self.roots[name] = config.path
+            self.excludes[name] = tuple(rule.casefold() for rule in config.exclude)
         self._cache = OrderedDict()
         self._lock = Lock()
 
@@ -142,10 +163,45 @@ class GitTruth:
     def _root(self, repo):
         if not isinstance(repo, str) or repo not in self.roots:
             raise DomainError("Unknown repository")
-        root = Path(self.roots[repo])
-        if not root.is_absolute() or not (root / ".git").exists():
+        root = self.roots[repo]
+        if not (root / ".git").exists():
             raise DomainError("Configured Git checkout is unreachable")
         return root
+
+    def _check_path(self, repo, path):
+        folded = safe_path(path).casefold()
+        for rule in self.excludes[repo]:
+            if folded == rule or folded.startswith(rule.removesuffix("/") + "/"):
+                raise DomainError("Anchor path excluded by repository configuration")
+        return path
+
+    def suggest_paths(self, text: str, *, anchored=()) -> list[dict]:
+        mentions = _path_mentions(text)
+        suggestions = []
+        for repo in self.roots:
+            try:
+                root = self._root(repo)
+                head = _sha(root, "HEAD")
+                # Check the top-level tree once so ordinary prose costs no per-word Git reads.
+                names = self._cached(("tree", root, head), lambda: set(
+                    _run(root, "ls-tree", "-z", "--name-only", head).stdout.split(b"\0")[:-1]))
+            except DomainError:
+                continue
+            for path, spans in mentions.items():
+                if (repo, path) in anchored or path.partition("/")[0].encode("utf-8") not in names:
+                    continue
+                try:
+                    self._check_path(repo, path)
+                    lines = self._lines(root, head, path)
+                except DomainError:
+                    continue
+                for start, end in spans:
+                    if end is None or end <= len(lines):
+                        suggestions.append(dict(repo=repo, path=path, start_line=start, end_line=end))
+                        break
+                if len(suggestions) == 20:
+                    return suggestions
+        return suggestions
 
     def _lines(self, root, sha, path):
         def read():
@@ -170,6 +226,8 @@ class GitTruth:
         fields = anchor_spec(spec)
         root = self._root(fields["repo"])
         kind, ref = fields["kind"], fields["ref"]
+        if kind == "file":
+            self._check_path(fields["repo"], fields["path"])
         sha = _sha(root, f"refs/heads/{ref}" if kind == "branch" else ref)
         if kind == "file":
             lines = self._lines(root, sha, fields["path"])
@@ -200,11 +258,11 @@ class GitTruth:
                       working_dirty=False, message="", suggested_pin=None)
         try:
             root = self._root(repo)
+            path = self._check_path(repo, anchor["path"]) if kind == "file" else ""
             ref = "refs/heads/" + _ref(anchor["ref"]) if kind == "branch" else "HEAD"
             if (root, ref) not in reads:
                 reads[root, ref] = _sha(root, ref)
             head = result["head_sha"] = reads[root, ref]
-            path = safe_path(anchor["path"]) if kind == "file" else ""
             key = (root, head, path)
             if key not in reads:
                 args = ("--", path) if path else ()

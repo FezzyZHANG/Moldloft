@@ -1,6 +1,6 @@
 import {Canvas} from './canvas.js';
 import {Inspector} from './inspector.js';
-import {groupKey, matchesItem, previewOverlay, project, ticketKey} from './layout.js';
+import {filterItems, groupKey, groupValue, matchesItem, matchesStatus, previewOverlay, project, ticketKey} from './layout.js';
 import {Palette} from './palette.js';
 import {Review} from './review.js';
 import {Sidebar} from './sidebar.js';
@@ -72,7 +72,8 @@ function reveal(target) {
   const view = store.view;
   if (!matchesItem(row, view.search)) view.search = '';
   if (target.type === 'ticket') {
-    if (view.status && row.status !== view.status) view.status = '';
+    if (!matchesStatus(row, view.status)) view.status = '';
+    if (view.group && groupValue(row.group_name) !== view.group) view.group = '';
     store.collapsed.delete(groupKey(row.group_name));
     const byId = new Map(store.graph.tickets.map(ticket => [ticket.id, ticket]));
     let item = row;
@@ -80,8 +81,12 @@ function reveal(target) {
       store.collapsed.delete(ticketKey(item.id));
       item = byId.get(item.parent_id);
     }
-  } else if (row.in_graph) view.showNotes = true;
-  else view.local = false;
+  } else if (row.in_graph) {
+    view.showNotes = true;
+    if ((view.status || view.group) && !filterItems(store.graph, view).notes.includes(row)) {
+      view.status = view.group = '';
+    }
+  } else view.local = false;
 }
 
 async function select(target, {reveal: show = false, replace = false} = {}) {

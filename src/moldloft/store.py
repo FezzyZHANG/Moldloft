@@ -1,5 +1,6 @@
 """Transactional graph, search, and review operations backed by one SQLite database."""
 
+from collections import defaultdict
 from contextlib import closing, contextmanager
 from copy import deepcopy
 from hashlib import sha256
@@ -50,9 +51,10 @@ def _snapshot(conn, graph_id):
 
 
 def _target(value):
-    text = str(value)
-    if re.fullmatch(r"(ticket:)?[0-9]{1,19}", text):
-        key = int(text.removeprefix("ticket:"))
+    text = str(value).strip()
+    ticket = re.fullmatch(r"(?:ticket:|#)?([0-9]{1,19})", text)
+    if ticket:
+        key = int(ticket[1])
         if 0 < key <= 2**63 - 1:
             return "ticket", key
     key = text.removeprefix("note:")
@@ -443,9 +445,38 @@ class Store:
         anchors = self.snapshot(graph_id)["anchors"] if target is None else self.get_item(target, graph_id)["anchors"]
         return (self.git_truth or GitTruth()).verify_many(anchors)
 
-    def reanchor(self, anchor_id, *, ref="HEAD", start_line=None, end_line=None, symbol=None, claim=None):
+    def suggest_anchors(self, graph_id="default", target=None) -> list[dict]:
+        kind, key = ("ticket", None) if target is None else _target(target)
+        fields = ("title", "description", "tech_notes") if kind == "ticket" else ("title", "summary", "body")
+        query = f"SELECT id, {', '.join(fields)} FROM {kind}s WHERE graph_id=?"
+        with self._read() as conn:
+            _graph(conn, graph_id)
+            if key is None:
+                items = _rows(conn, query + " AND status IN ('open','in_progress') ORDER BY id LIMIT 100", graph_id)
+            else:
+                items = [_one(conn, query + " AND id=?", graph_id, key)]
+            if not items or not self.git_truth or not self.git_truth.roots:
+                return []
+            ids = [str(item["id"]) for item in items]
+            slots = ",".join("?" for _ in ids)
+            pinned = defaultdict(set)
+            for row in conn.execute(f"""SELECT target_id, repo, path FROM anchors WHERE graph_id=?
+                    AND target_type=? AND kind='file' AND target_id IN ({slots})""", (graph_id, kind, *ids)):
+                pinned[row["target_id"]].add((row["repo"], row["path"]))
+        result = []
+        for item in items:
+            key = item["id"]
+            text = "\n".join(item[field] for field in fields)
+            paths = self.git_truth.suggest_paths(text, anchored=pinned[str(key)])
+            result.extend(dict(path, target_type=kind, target_id=key) for path in paths)
+        return result
+
+    def reanchor(self, anchor_id, *, ref="HEAD", start_line=None, end_line=None, symbol=None, claim=None,
+                 graph_id=None):
         with self._write() as conn:
             row = _one(conn, "SELECT * FROM anchors WHERE id=?", anchor_id)
+            if graph_id is not None and graph_id != row["graph_id"]:
+                raise DomainError("Anchor not found in graph", 404)
             before = _snapshot(conn, row["graph_id"])
             fields = dict(ref=row["ref"] if row["kind"] == "branch" and ref == "HEAD" else ref)
             fields.update({k: v for k, v in dict(start_line=start_line, end_line=end_line,

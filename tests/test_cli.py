@@ -56,7 +56,7 @@ class CliTests(StoreCase):
                           "p.write_bytes(p.read_bytes().replace(b'title: Before', b'title: After'))\n", encoding="utf-8")
         args = [sys.executable, str(editor)]
         cmd = subprocess.list2cmdline(args) if os.name == "nt" else shlex.join(args)
-        self.assertTrue(self.invoke("edit", tid, "--editor", cmd)["changed"])
+        self.assertTrue(self.invoke("edit", f"#{tid}", "--editor", cmd)["changed"])
         self.assertEqual(self.store.get_item(tid)["item"]["title"], "After")
         self.checkout()
         self.store.git_truth = GitTruth({"fixture": self.repo})
@@ -64,11 +64,68 @@ class CliTests(StoreCase):
                                 anchor=dict(kind="file", repo="fixture", path=self.file.name))])
         file = self.root / "repos.json"
         file.write_text(json.dumps({"fixture": str(self.repo)}), encoding="utf-8")
-        self.assertEqual(self.invoke("verify", "--repos", file, "--target", tid, "--json")[0]["status"], "fresh")
+        self.assertEqual(self.invoke("verify", "--repos", file, "--target", f"#{tid}", "--json")[0]["status"], "fresh")
         self.file.write_bytes(b"Changed\n")
         self.commit("Update")
         self.assertEqual(self.invoke("--repo", f"fixture={self.repo}", "verify", "--json", code=2)[0]["status"], "drifted")
         self.assertIn("missing", self.invoke("verify", code=2, raw=True))
+
+    def test_anchor_cli_file_lifecycle_honors_graph_and_target(self):
+        self.checkout()
+        self.ticket(f"`{self.file.name}:2-3`")
+        self.store.create_graph("Other", "other")
+        def anchor(*args, **kwargs):
+            return self.invoke("--repo", f"fixture={self.repo}", "anchor", *args, **kwargs)
+        before = self.store.revision()
+        suggestion = anchor("suggest", "--target", "#1", "--json")
+        self.assertEqual(suggestion, [dict(target_type="ticket", target_id=1, repo="fixture",
+                                          path=self.file.name, start_line=2, end_line=3)])
+        self.assertIn(f"fixture:{self.file.name}:2-3", anchor("suggest", raw=True))
+        self.assertEqual(self.store.revision(), before)
+        def add(*args, **kwargs):
+            return anchor("add", "#1", "--repo", "fixture", "--path", self.file.name, *args, **kwargs)
+        self.assertIn("--lines", add("--lines", "bad", code=1))
+        aid = add("--lines", "2-3", "--ref", "HEAD", "--symbol", "demo", "--claim", "Initial")["anchors_created"][0]
+        self.assertEqual(anchor("suggest", "--json"), [])
+        row, = anchor("ls", "--target", "#1", "--json")
+        self.assertEqual((row["id"], row["start_line"], row["end_line"], row["symbol"], row["claim"]),
+                         (aid, 2, 3, "demo", "Initial"))
+        self.assertIn("ticket:1", anchor("ls", raw=True))
+        self.assertEqual(anchor("ls", "--graph", "other", "--json"), [])
+        anchor("rm", aid, "--graph", "other", code=1)
+        anchor("reanchor", aid, "--graph", "other", code=1)
+        self.file.write_bytes(b"new first line\n" + self.file.read_bytes())
+        head = self.commit("shift file")
+        anchor("reanchor", aid, "--lines", "3-4", "--symbol", "shifted", "--claim", "Reviewed")
+        row, = anchor("ls", "--json")
+        self.assertEqual((row["pinned_sha"], row["start_line"], row["end_line"], row["symbol"], row["claim"]),
+                         (head, 3, 4, "shifted", "Reviewed"))
+        anchor("rm", aid)
+        self.assertEqual(anchor("ls", "--json"), [])
+        self.assertEqual(anchor("suggest", "--json"), suggestion)
+
+    def test_configured_exclusions_and_commit_and_branch_anchors(self):
+        self.checkout()
+        self.note("n-doc", body=f"`{self.file.name}`")
+        path = self.root / "repos.json"
+        path.write_text(json.dumps({"fixture": {"path": str(self.repo), "exclude": [self.file.name]}}),
+                        encoding="utf-8")
+        def add(*args, **kwargs):
+            return self.invoke("anchor", "add", "n-doc", "--repo", "fixture", *args, **kwargs)
+        with patch.dict(os.environ, {"MOLDLOFT_REPOS": str(path)}):
+            self.assertEqual(self.invoke("anchor", "suggest", "--target", "n-doc", "--json"), [])
+            self.assertIn("excluded", add("--path", self.file.name, code=1))
+            add("--branch", "main")
+            add("--commit", "HEAD")
+            add("--commit", "HEAD", "--lines", "1-2", code=1)
+            def inspect_reload(*args, **kwargs):
+                from moldloft.config import resolve_repo_configs
+                self.assertEqual(resolve_repo_configs()["fixture"].exclude, (self.file.name,))
+            with patch("moldloft.__main__.uvicorn.run", side_effect=inspect_reload):
+                self.invoke("serve", "--reload", raw=True)
+        branch, commit = self.invoke("anchor", "ls", "--target", "n-doc", "--json")
+        self.assertEqual((branch["kind"], branch["ref"]), ("branch", "main"))
+        self.assertEqual((commit["kind"], commit["ref"]), ("commit", self.git("rev-parse", "HEAD")))
 
     def test_scoped_and_full_exports_and_restore(self):
         self.ticket("Default")

@@ -67,26 +67,47 @@ export function matchesItem(row, search) {
     .some(value => value?.toLowerCase().includes(query));
 }
 
-export function project(graph, collapsed = new Set(), filter = {}) {
-  const showNotes = filter.showNotes !== false;
-  const types = showNotes ? filter.types : new Set(filter.types && !filter.types.has('requires') ? [] : ['requires']);
-  const local = filter.focus ? neighborhood(graph, filter.focus, filter.depth, types, filter.direction) : null;
+export function matchesStatus(row, status) {
+  if (status === 'active') return row.status === 'open' || row.status === 'in_progress';
+  if (status === 'ready') return Boolean(row.ready);
+  return !status || row.status === status;
+}
+
+export function groupValue(name) {
+  if (!name) return '__ungrouped__';
+  return name.startsWith('__') ? '_' + name : name;
+}
+
+export function filterItems(graph, filter, local = null) {
   const byId = new Map(graph.tickets.map(row => [row.id, row]));
+  const matching = graph.tickets.filter(row => (!local || local.has(ticketKey(row.id))) &&
+    matchesStatus(row, filter.status) && (!filter.group || groupValue(row.group_name) === filter.group) &&
+    matchesItem(row, filter.search));
   const included = new Set();
-  for (const row of graph.tickets) {
-    if ((local && !local.has(ticketKey(row.id))) || (filter.status && row.status !== filter.status) ||
-        !matchesItem(row, filter.search)) continue;
+  for (const row of matching) {
     let parent = row;
     while (parent && !included.has(parent.id)) {
       included.add(parent.id);
       parent = byId.get(parent.parent_id);
     }
   }
+  const scoped = !filter.local && !local && (filter.status || filter.group);
+  const linked = scoped && new Set((graph.note_links || [])
+    .filter(link => link.target_type === 'ticket' && included.has(link.target_id)).map(link => link.source_note_id));
+  const notes = (graph.notes || []).filter(note => matchesItem(note, filter.search) &&
+    (!local || local.has(noteKey(note.id))) && (!linked || note.in_graph === false || linked.has(note.id)));
+  return {matching, included, notes};
+}
 
+export function project(graph, collapsed = new Set(), filter = {}) {
+  const showNotes = filter.showNotes !== false;
+  const types = showNotes ? filter.types : new Set(filter.types && !filter.types.has('requires') ? [] : ['requires']);
+  const local = filter.focus ? neighborhood(graph, filter.focus, filter.depth, types, filter.direction) : null;
+  const {included, notes} = filterItems(graph, filter, local);
   const groups = new Map();
   const tickets = new Map();
-  for (const id of [...included].sort(compare)) {
-    const ticket = byId.get(id);
+  for (const ticket of graph.tickets.filter(row => included.has(row.id)).sort((a, b) => compare(a.id, b.id))) {
+    const id = ticket.id;
     const group = ticket.group_name || '';
     if (!groups.has(group)) {
       groups.set(group, {id: groupKey(group), width: 252, height: 60, children: [],
@@ -94,8 +115,8 @@ export function project(graph, collapsed = new Set(), filter = {}) {
     }
     tickets.set(id, {id: ticketKey(id), width: 244, height: 114, children: [], data: {ticket}});
   }
-  for (const [id, node] of tickets) {
-    const row = byId.get(id);
+  for (const node of tickets.values()) {
+    const row = node.data.ticket;
     const parent = tickets.get(row.parent_id) || groups.get(row.group_name || '');
     parent.children.push(node);
   }
@@ -115,9 +136,7 @@ export function project(graph, collapsed = new Set(), filter = {}) {
   const children = [...groups.values()].sort((a, b) => compare(a.id, b.id));
   for (const group of children) visit(group);
   if (showNotes) {
-    const notes = (graph.notes || []).filter(note => note.in_graph !== false &&
-      (!local || local.has(noteKey(note.id))) && matchesItem(note, filter.search));
-    for (const note of notes.sort((a, b) => compare(a.id, b.id))) {
+    for (const note of notes.filter(row => row.in_graph !== false).sort((a, b) => compare(a.id, b.id))) {
       const node = {id: noteKey(note.id), width: 244, height: 114, data: {note}};
       children.push(node);
       visit(node);

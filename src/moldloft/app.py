@@ -13,7 +13,7 @@ from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict
 
-from .config import resolve_repos
+from .config import resolve_repo_configs
 from .errors import DomainError
 from .git_truth import GitTruth
 from .mcp_server import create_mcp
@@ -118,7 +118,7 @@ async def _events(store, graph_id, request):
 def create_app(db_path=None, *, repos=None, allowed_hosts=None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app):
-        app.state.store = Store(db_path, GitTruth(resolve_repos(repos)))
+        app.state.store = Store(db_path, GitTruth(resolve_repo_configs(repos)))
         app.state.mcp = create_mcp(app.state.store, allowed_hosts=allowed_hosts)
         app.state.mcp_http_app = app.state.mcp.streamable_http_app()
         async with app.state.mcp.session_manager.run():
@@ -248,6 +248,10 @@ def create_app(db_path=None, *, repos=None, allowed_hosts=None) -> FastAPI:
     @app.get("/api/graphs/{graph_id}/verify")
     def verify(graph_id: str, target: str | None = None):
         return dict(results=state.store.verify_ground_truth(graph_id, target))
+
+    @app.get("/api/graphs/{graph_id}/anchor-suggestions")
+    def anchor_suggestions(graph_id: str, target: str | None = None):
+        return dict(suggestions=state.store.suggest_anchors(graph_id, target))
 
     @app.post("/api/anchors/{anchor_id}/reanchor")
     def reanchor(anchor_id: int, body: Reanchor = Reanchor()):

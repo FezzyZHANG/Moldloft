@@ -64,7 +64,7 @@ export class WorkbenchStore {
   drift = new Map();
   connection = 'offline';
   collapsed = new Set();
-  view = {mode: 'graph', search: '', status: '', local: false, direction: 'both', depth: 1,
+  view = {mode: 'graph', search: '', status: '', group: '', local: false, direction: 'both', depth: 1,
     showNotes: true, types: new Set(edgeTypes), connect: null};
   listeners = new Set();
   opening = 0;
@@ -107,6 +107,7 @@ export class WorkbenchStore {
     this.verificationOrder.clear();
     this.collapsed.clear();
     this.view.connect = null;
+    this.view.group = '';
     this.pendingSig = null;
     this.connection = 'connecting';
     this.emit('open');

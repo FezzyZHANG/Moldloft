@@ -34,13 +34,16 @@
   <main class="workspace">
     <aside id="navigator" aria-label="导航">
       <div class="nav-controls">
-        <input id="search" type="search" placeholder="搜索工单和笔记" aria-label="搜索工单和笔记">
-        <div class="toolbar">
-          <select id="status-filter" aria-label="按工单状态筛选"></select>
+        <div class="nav-search">
+          <input id="search" type="search" placeholder="搜索工单和笔记" aria-label="搜索工单和笔记">
           <div class="segmented" aria-label="工作区视图">
             <button type="button" id="graph-mode" aria-pressed="true">图谱</button>
             <button type="button" id="list-mode" aria-pressed="false">表格</button>
           </div>
+        </div>
+        <div class="nav-filters">
+          <select id="status-filter" aria-label="按工单状态筛选"></select>
+          <select id="group-filter" aria-label="按工单分组筛选"></select>
         </div>
       </div>
       <div class="nav-scroll">

@@ -98,6 +98,20 @@ class ApiTests(StoreCase):
             self.assertIsNot(app.state.mcp, first)
             self.assertEqual(c.get(self.graph).status_code, 200)
 
+    def test_anchor_suggestions_are_scoped_reads(self):
+        tid = self.ticket("Review", tech_notes=f"`{self.file.name}:2-3`")
+        url = self.graph + "/anchor-suggestions"
+        expected = dict(suggestions=[dict(target_type="ticket", target_id=tid, repo="fixture",
+                                          path=self.file.name, start_line=2, end_line=3)])
+        before = self.store.snapshot()
+        self.assertEqual(self.api("GET", url), expected)
+        self.assertEqual(self.api("GET", url, params={"target": f"#{tid}"}), expected)
+        self.api("GET", url, params={"target": "n-missing"}, expected=404)
+        self.assertEqual(self.store.snapshot(), before)
+        self.api("POST", self.graph + "/mutate", dict(operations=[dict(op="anchor_add", target_type="ticket",
+                 target_id=tid, anchor=dict(kind="file", repo="fixture", path=self.file.name))]))
+        self.assertEqual(self.api("GET", url), {"suggestions": []})
+
     def test_git_reads_and_explicit_reanchor(self):
         tid = self.ticket("Review")
         anchor = dict(kind="file", repo="fixture", path=self.file.name, start_line=2, end_line=3)

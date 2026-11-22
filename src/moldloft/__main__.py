@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
 import sqlite3
 import subprocess
 import sys
@@ -11,13 +12,13 @@ from tempfile import TemporaryDirectory
 
 import uvicorn
 
-from .config import load_env_file, resolve_db_path, resolve_repos
+from .config import load_env_file, RepoConfig, resolve_db_path, resolve_repo_configs
 from .errors import DomainError
 from .git_truth import GitTruth
 from .markdown_io import edit_in_editor, export_workspace, import_workspace
 from .mcp_server import run_stdio
 from .reducer import NOTE_KINDS, TICKET_PRIORITIES, TICKET_STATUSES
-from .store import Store
+from .store import Store, _target
 
 
 def _args(argv):
@@ -44,6 +45,31 @@ def _args(argv):
     verify.add_argument("--target")
     for cmd in (listing, ready, verify):
         cmd.add_argument("--json", action="store_true")
+    anchor = commands.add_parser("anchor", help="manage Git anchors and find suggested paths")
+    actions = anchor.add_subparsers(dest="action", required=True)
+    add = actions.add_parser("add")
+    add.add_argument("target")
+    add.add_argument("--repo", required=True, dest="repo_id", metavar="NAME")
+    kinds = add.add_mutually_exclusive_group(required=True)
+    kinds.add_argument("--path")
+    kinds.add_argument("--commit", metavar="REF")
+    kinds.add_argument("--branch", metavar="NAME")
+    actions.add_parser("rm").add_argument("anchor_id", type=int)
+    reanchor = actions.add_parser("reanchor")
+    reanchor.add_argument("anchor_id", type=int)
+    for cmd in (add, reanchor):
+        cmd.add_argument("--ref")
+        cmd.add_argument("--lines", metavar="START-END")
+        cmd.add_argument("--symbol")
+        cmd.add_argument("--claim")
+    for action in ("ls", "suggest"):
+        cmd = actions.add_parser(action)
+        cmd.add_argument("--target")
+        cmd.add_argument("--json", action="store_true")
+    if rest[:2] == ["anchor", "add"]:
+        # The shared parser collected both checkout mappings and the anchor's repository name.
+        rest.extend("--repo=" + entry for entry in settings.repo if "=" not in entry)
+        settings.repo = [entry for entry in settings.repo if "=" in entry]
     new = commands.add_parser("new", help="create a ticket or named note")
     new.add_argument("title", metavar="TITLE")
     new.add_argument("--group")
@@ -76,14 +102,15 @@ def _repos(args):
         if not sep or not path:
             raise DomainError("Expected --repo NAME=PATH")
         roots[name] = path
-    return resolve_repos(roots, args.repos)
+    return resolve_repo_configs(roots, args.repos)
 
 
 def _serve(path, roots, host, port, reload=False):
     # Uvicorn's reload worker imports its factory in a new interpreter.
     with TemporaryDirectory() as temp:
         config = Path(temp) / "repos.json"
-        config.write_text(json.dumps({k: str(v) for k, v in roots.items()}), encoding="utf-8")
+        config.write_text(json.dumps({k: dict(path=str(v.path), exclude=v.exclude) if v.exclude else str(v.path)
+                                      for k, v in roots.items()}), encoding="utf-8")
         env = dict(MOLDLOFT_DB=str(path), MOLDLOFT_REPOS=str(config))
         previous = {k: os.getenv(k) for k in env}
         os.environ.update(env)
@@ -116,7 +143,7 @@ def _demo(port):
         source.write_bytes(b"Collect inputs\nReview constraints\nShip on Monday\n")
         git("add", source.name)
         git("commit", "-m", "Initial schedule")
-        roots = {"example": repo}
+        roots = {"example": RepoConfig(repo)}
         store = Store(root / "demo.db", GitTruth(roots))
         store.mutate([
             dict(op="ticket_create", temp_id="new:review", fields=dict(title="Review the release schedule")),
@@ -153,6 +180,47 @@ def _print(value):
     print(json.dumps(value, ensure_ascii=False, indent=2))
 
 
+def _anchor(store, graph, args):
+    if args.action in ("ls", "suggest"):
+        if args.action == "suggest":
+            rows = store.suggest_anchors(graph, args.target)
+        elif args.target is None:
+            rows = store.snapshot(graph)["anchors"]
+        else:
+            rows = store.get_item(args.target, graph)["anchors"]
+        if args.json:
+            _print(rows)
+        else:
+            for row in rows:
+                location = row["path"] or row["ref"]
+                if row["start_line"] is not None:
+                    location += f":{row['start_line']}-{row['end_line']}"
+                print(f"{row.get('id', '+')}\t{row['target_type']}:{row['target_id']}\t{row['repo']}:{location}")
+        return
+    if args.action == "rm":
+        _print(store.mutate([dict(op="anchor_remove", anchor_id=args.anchor_id)], graph_id=graph))
+        return
+    fields = {k: getattr(args, k) for k in ("ref", "symbol", "claim") if getattr(args, k) is not None}
+    if args.lines is not None:
+        span = re.fullmatch(r"([0-9]{1,9})-([0-9]{1,9})", args.lines)
+        if not span:
+            raise DomainError("Expected --lines START-END")
+        fields.update(start_line=int(span[1]), end_line=int(span[2]))
+    if args.action == "reanchor":
+        _print(store.reanchor(args.anchor_id, graph_id=graph, **fields))
+        return
+    kind, key = _target(args.target)
+    if args.path is not None:
+        fields.update(kind="file", path=args.path)
+    else:
+        ref = args.branch if args.branch is not None else args.commit
+        if args.ref is not None and args.ref != ref:
+            raise DomainError("--ref conflicts with the selected branch or commit")
+        fields.update(kind="branch" if args.branch is not None else "commit", ref=ref)
+    _print(store.mutate([dict(op="anchor_add", target_type=kind, target_id=key,
+                              anchor=dict(fields, repo=args.repo_id))], graph_id=graph))
+
+
 def main(argv=None) -> int:
     try:
         load_env_file()
@@ -172,6 +240,8 @@ def main(argv=None) -> int:
         store = Store(path, GitTruth(roots))
         if command == "mcp":
             run_stdio(store)
+        elif command == "anchor":
+            _anchor(store, graph, args)
         elif command == "new":
             _print(_new(store, graph, args))
         elif command == "done":

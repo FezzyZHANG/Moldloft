@@ -35,8 +35,8 @@ The browser loads its interface and layout worker from the installed package.
 | Setting | Value |
 | --- | --- |
 | `--db PATH` or `MOLDLOFT_DB` | Path to the workspace database |
-| `--repos FILE` or `MOLDLOFT_REPOS` | Path to a UTF-8 JSON object mapping repository names to absolute checkout paths |
-| `--repo NAME=PATH` | Repeatable checkout mapping. An explicit name overrides its entry in the file |
+| `--repos FILE` or `MOLDLOFT_REPOS` | Path to a UTF-8 JSON object mapping repository names to absolute checkout paths or objects with `path` and optional `exclude` |
+| `--repo NAME=PATH` | Repeatable checkout mapping. An explicit path overrides the configured checkout path and retains its exclusions |
 | `MOLDLOFT_ENV_FILE` | Path to an optional file of `KEY=VALUE` assignments. Existing environment variables take precedence |
 
 The database defaults to `%LOCALAPPDATA%\Moldloft\moldloft.db` on Windows and
@@ -46,15 +46,20 @@ For example, save this as `repos.json` and run `moldloft serve --repos repos.jso
 ```json
 {
   "app": "C:/work/app",
-  "docs": "C:/work/docs"
+  "docs": {"path": "C:/work/docs", "exclude": ["generated/", "internal/draft.md"]}
 }
 ```
+
+Exclusions are case-insensitive, repository-relative paths. A trailing slash
+matches files under that directory. Other entries match the exact path and its
+descendants. Pinning, verification and suggestions respect the same rules.
 
 ## Plan and explore
 
 Create or switch graphs in the top bar. Select a ticket or note to open its
 inspector. The local graph view follows upstream or downstream links from the
-selection. The table view and sidebar filters help with larger graphs.
+selection. Filter by group and status, including active or ready work, to see
+matching tickets and their linked canvas notes.
 
 - An edge `A → B` means B depends on A. An `open` ticket is ready when every
   direct blocker is `done`. A `closed` blocker still blocks.
@@ -82,7 +87,23 @@ symbol and claim. Verify Ground Truth compares the saved pin with the checkout.
 | `missing` | The checkout, ref, pin or required file is unavailable for verification |
 
 Inspect the diff or suggested range before explicitly re-anchoring.
-`moldloft verify --target 1 --json` checks one ticket. Omit `--target` for the
+The inspector suggests tracked files mentioned in item text. Click a suggestion
+to review its path and lines, then choose **固定锚点** to pin it.
+
+```shell
+moldloft anchor suggest --target "#1" --json
+moldloft anchor add "#1" --repo app --path src/main.py --lines 4-12 --claim "Entry point"
+moldloft anchor ls --target "#1" --json
+moldloft anchor reanchor 1 --ref HEAD --lines 6-14
+moldloft anchor rm 1
+```
+
+Use `--commit REF` or `--branch NAME` for a commit or branch anchor. Without a
+target, `anchor suggest` checks the first 100 open or in-progress tickets by ID
+and returns up to 20 unpinned paths per item. Quote `"#1"` when passing a ticket
+ID to a shell that treats `#` as a comment.
+
+`moldloft verify --target "#1" --json` checks one ticket. Omit `--target` for the
 whole graph. Exit code 2 signals at least one `drifted` or `missing` result.
 
 ## Edit and exchange work

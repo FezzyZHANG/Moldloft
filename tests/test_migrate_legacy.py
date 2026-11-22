@@ -228,6 +228,20 @@ class LegacyMigrationTests(StoreCase):
         self.assertEqual((stale["summary"], stale["body"]), ("摘要\n\nSummary", "changed"))
         self.assertEqual(files(self.legacy), original)
 
+    def test_excluded_legacy_anchor_is_preserved_without_backfilling_an_excerpt(self):
+        database(self.source, 1)
+        self.checkout()
+        sql(self.source, "INSERT INTO tickets VALUES (?,?,?,?)", [(1, "Review", "open", "low")])
+        sql(self.source, "INSERT INTO code_links VALUES (?,?,?,?,?,?,?,?)", [
+            (1, 1, "app", "file", self.git("rev-parse", "HEAD"), self.file.name, 2, 2)])
+        config = self.root / "repos.json"
+        config.write_text(json.dumps({"app": {"path": str(self.repo), "exclude": [self.file.name]}}), encoding="utf-8")
+        status, report = cli("--source-db", self.source, "--target-db", self.target, "--repos", config, "--apply")
+        self.assertEqual(status, 0, report)
+        self.assertEqual(report["unverified_anchors"], 1)
+        anchor, = Store(self.target).get_item("#1")["anchors"]
+        self.assertEqual((anchor["path"], anchor["content_hash"], anchor["excerpt"]), (self.file.name, "", ""))
+
     def test_single_database_optional_notes_and_replace(self):
         database(self.source, 1)
         sql(self.source, "INSERT INTO tickets VALUES (?,?,?,?)", [(71, "Original", "open", "low")])

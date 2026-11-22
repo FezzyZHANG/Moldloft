@@ -1,3 +1,7 @@
 {
-  "project": "C:/absolute/project"
+  "project": "C:/absolute/project",
+  "docs": {
+    "path": "C:/absolute/docs",
+    "exclude": ["generated/", "internal/draft.md"]
+  }
 }

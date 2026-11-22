@@ -14,7 +14,7 @@ from tempfile import TemporaryDirectory
 if __name__ == "__main__":
     sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from moldloft.config import resolve_repos
+from moldloft.config import resolve_repo_configs
 from moldloft.db import SCHEMA_VERSION, _SCHEMA, connect, rebuild_fts, utc_now, write_tx
 from moldloft.errors import DomainError
 from moldloft.git_truth import GitTruth, anchor_spec
@@ -431,7 +431,7 @@ def main(argv=None) -> int:
                 raise ValueError("Expected --repo NAME=PATH")
             roots[name] = path
         report = migrate_legacy(args.source_db, args.target_db, source_notes=args.source_notes,
-                                repos=resolve_repos(roots, args.repos), apply=args.apply, replace=args.replace)
+                                repos=resolve_repo_configs(roots, args.repos), apply=args.apply, replace=args.replace)
     except ERRORS as exc:
         report = _report()
         report["errors"].append(str(exc))

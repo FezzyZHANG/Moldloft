@@ -7,7 +7,7 @@ from pathlib import Path
 from threading import Barrier
 from unittest.mock import patch
 
-from moldloft.config import default_db_path, load_env_file, resolve_db_path, resolve_repos
+from moldloft.config import default_db_path, load_env_file, RepoConfig, resolve_db_path, resolve_repo_configs, resolve_repos
 from moldloft.db import connect, init_db, rebuild_fts, utc_now, write_tx
 from moldloft.errors import DomainError
 from moldloft.reducer import reduce_graph
@@ -57,6 +57,20 @@ class DatabaseTests(StoreCase):
             for invalid in ({"-bad": self.root}, {"x" * 41: self.root}, {"valid": Path("relative")}):
                 with self.subTest(invalid=invalid), self.assertRaises(DomainError):
                     resolve_repos(invalid)
+
+    def test_repository_file_accepts_mixed_configs_and_validates_rules(self):
+        config = self.root / "repos.json"
+        rules = ["Docs/", "private/file.md"]
+        config.write_text(json.dumps({"simple": str(self.root), "filtered": {"path": str(self.root), "exclude": rules}}),
+                          encoding="utf-8")
+        with patch.dict(os.environ, {"MOLDLOFT_REPOS": str(config)}):
+            self.assertEqual(resolve_repos(), {"simple": self.root, "filtered": self.root})
+            self.assertEqual(resolve_repo_configs()["filtered"], RepoConfig(self.root, tuple(rules)))
+            self.assertEqual(resolve_repo_configs({"filtered": self.root / "new"})["filtered"],
+                             RepoConfig(self.root / "new", tuple(rules)))
+            for invalid in ("dir/", ["/absolute"], ["../escape"], [""], [None], None):
+                with self.subTest(invalid=invalid), self.assertRaises(DomainError):
+                    resolve_repo_configs({"filtered": {"path": self.root, "exclude": invalid}})
 
 
 class GraphTests(StoreCase):
@@ -177,6 +191,23 @@ class GraphTests(StoreCase):
         self.store.mutate([dict(op="note_delete", note_id="n-first")])
         self.assertFalse(self.store.snapshot()["note_links"])
         self.assertEqual(self.store.get_item("n-second")["item"]["version"], 2)
+
+    def test_exact_targets_rank_first_across_graph_and_kind_filters(self):
+        self.note("n-other", body="ticket:1 #1 n-slug")
+        self.ticket("First ticket")
+        self.note("n-slug", body="Some other text")
+        for query, key in (("#1", 1), ("ticket:1", 1), ("1", 1), ("n-slug", "n-slug")):
+            with self.subTest(query=query):
+                rows = self.store.search(f" {query} ", "default")
+                self.assertEqual(rows[0]["item_id"], str(key))
+                self.assertIn("n-other", [r["item_id"] for r in rows[1:]])
+                self.assertEqual(self.store.get_item(query, "default")["item"]["id"], key)
+        self.assertEqual(self.store.search("#1", kind="note")[0]["item_id"], "n-other")
+        self.store.create_graph("Second", "other")
+        self.assertEqual(self.store.search("#1", "other"), [])
+        for invalid in ("#0", "##1", "#-1", "#9223372036854775808", "#1x"):
+            with self.assertRaises(DomainError):
+                self.store.get_item(invalid)
 
     def test_search_escapes_queries_rebuilds_and_updates(self):
         tid = self.ticket("Searchable", tech_notes="gear\nwheel")

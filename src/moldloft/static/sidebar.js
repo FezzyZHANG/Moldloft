@@ -1,4 +1,4 @@
-import {matchesItem, groupKey} from './layout.js';
+import {filterItems, groupKey, groupValue} from './layout.js';
 import {api, graphPath, targetName} from './store.js';
 import {bindForm, button, byId, element, noteStates, options, showDialog, statuses} from './ui.js';
 
@@ -11,6 +11,7 @@ export class Sidebar {
     this.actions = actions;
     this.graphSelect = byId('graph-select');
     this.status = byId('status-filter');
+    this.group = byId('group-filter');
     this.search = byId('search');
     this.bind();
   }
@@ -76,8 +77,9 @@ export class Sidebar {
       this.graphSelect.value = store.graph?.id || '';
       run(() => actions.openGraph(id));
     });
-    options(this.status, [['', '全部状态'], ...statuses]);
+    options(this.status, [['', '全部状态'], ['active', '未完成 (待处理 + 进行中)'], ['ready', '可立即执行 (Ready)'], ...statuses]);
     this.status.addEventListener('change', () => store.updateView({status: this.status.value}));
+    this.group.addEventListener('change', () => store.updateView({group: this.group.value}));
     this.search.addEventListener('input', () => store.updateView({search: this.search.value}));
     byId('graph-mode').addEventListener('click', () => store.updateView({mode: 'graph'}));
     byId('list-mode').addEventListener('click', () => store.updateView({mode: 'list'}));
@@ -115,6 +117,10 @@ export class Sidebar {
     if (graph && !graphs.some(row => row.id === graph.id)) choices.push([graph.id, graph.name]);
     options(this.graphSelect, choices, graph?.id);
     this.graphSelect.disabled = !choices.length;
+    const names = [...new Set(graph?.tickets.map(row => row.group_name) || [])].sort((a, b) => a.localeCompare(b));
+    const groups = [['', '全部分组'], ...names.map(name => [groupValue(name), name || '未分组'])];
+    if (!groups.some(([value]) => value === this.store.view.group)) this.store.view.group = '';
+    options(this.group, groups, this.store.view.group);
     byId('rename-graph').disabled = !graph;
     byId('delete-graph').disabled = !graph || graph.id === 'default';
   }
@@ -140,21 +146,11 @@ export class Sidebar {
     const focusKey = focus?.dataset.item;
     if (this.search.value !== view.search) this.search.value = view.search;
     this.status.value = view.status;
+    this.group.value = view.group;
     byId('graph-mode').setAttribute('aria-pressed', view.mode === 'graph');
     byId('list-mode').setAttribute('aria-pressed', view.mode === 'list');
 
-    const matching = graph.tickets.filter(row => matchesItem(row, view.search) &&
-      (!view.status || row.status === view.status));
-    const matched = new Set(matching.map(row => row.id));
-    const shown = new Set(matched);
-    const byTicket = new Map(graph.tickets.map(row => [row.id, row]));
-    for (const row of matching) {
-      let parent = byTicket.get(row.parent_id);
-      while (parent && !shown.has(parent.id)) {
-        shown.add(parent.id);
-        parent = byTicket.get(parent.parent_id);
-      }
-    }
+    const {matching, included: shown, notes} = filterItems(graph, view);
     const groups = new Map();
     const children = new Map();
     for (const row of graph.tickets) {
@@ -185,7 +181,6 @@ export class Sidebar {
           element('div', {className: 'tree-group-name'}, toggle(key, title), element('span', {text: title})),
           ...(!collapsed.has(key) ? [tree(rows)] : []));
       }) : [empty('没有符合条件的工单')]));
-    const notes = graph.notes.filter(row => matchesItem(row, view.search));
     for (const [id, active] of [['note-list', true], ['reference-list', false]]) {
       const rows = notes.filter(row => row.in_graph === active);
       byId(id).replaceChildren(...(rows.length ? rows.map(row => this.itemButton('note', row, row.kind)) :
