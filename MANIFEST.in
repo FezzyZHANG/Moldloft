@@ -1,15 +1,10 @@
-include AGENTS.md CLAUDE.md CHANGELOG.md DESIGN.md DEPLOYMENT.md MCP.md
-include .env.example
-recursive-include docs *.md
+include AGENTS.md ARCHITECTURE.md README.md .env.example
 recursive-include config *.example.json
-recursive-include src/tickets/templates *.html
-recursive-include src/tickets/static *.js *.css *.md
-recursive-include tests *.py *.mjs *.json
-recursive-include tools/agent_hooks *.py
-include tools/project.py
+recursive-include src/moldloft/static *.html *.js *.css *.md
+recursive-include scripts *.py
+recursive-include tests *.py *.mjs
 prune data
 prune notes
 prune review
 prune workspace
-prune organization
 global-exclude __pycache__ *.pyc *.db *.sqlite3 .env

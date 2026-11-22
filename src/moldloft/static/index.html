@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Moldloft</title>
+  <link rel="stylesheet" href="/static/app.css">
+  <script defer src="/static/vendor/elk/elk-api.js"></script>
+  <script type="module" src="/static/main.js"></script>
+</head>
+<body>
+  <header class="masthead">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"></span>Moldloft</div>
+    <div class="toolbar graph-switcher" aria-label="切换和管理图谱">
+      <select id="graph-select" aria-label="图谱"></select>
+      <button type="button" id="new-graph" aria-label="新建图谱" title="新建图谱">+</button>
+      <button type="button" id="rename-graph">重命名</button>
+      <button type="button" id="delete-graph">删除图谱</button>
+    </div>
+    <div class="toolbar mast-actions">
+      <button type="button" id="verify-graph">校验 Ground Truth <span id="drift-count" class="badge drifted" hidden></span></button>
+      <button type="button" id="pending-button">待审提案 <span id="pending-count">0</span></button>
+      <button type="button" id="open-palette">命令面板 <kbd>Ctrl+K</kbd></button>
+      <button type="button" id="new-ticket" class="accent">新建工单</button>
+      <button type="button" id="new-note">新建笔记</button>
+    </div>
+    <span id="connection" class="connection" role="status" data-state="offline">未连接</span>
+  </header>
+  <div class="notice" id="notice" hidden>
+    <span id="notice-text" role="alert"></span>
+    <button type="button" id="dismiss-notice" aria-label="关闭提示">×</button>
+  </div>
+
+  <main class="workspace">
+    <aside id="navigator" aria-label="导航">
+      <div class="nav-controls">
+        <input id="search" type="search" placeholder="搜索工单和笔记" aria-label="搜索工单和笔记">
+        <div class="toolbar">
+          <select id="status-filter" aria-label="按工单状态筛选"></select>
+          <div class="segmented" aria-label="工作区视图">
+            <button type="button" id="graph-mode" aria-pressed="true">图谱</button>
+            <button type="button" id="list-mode" aria-pressed="false">表格</button>
+          </div>
+        </div>
+      </div>
+      <div class="nav-scroll">
+        <section><h2>工单</h2><div id="ticket-tree"></div></section>
+        <section><h2>图谱笔记</h2><div id="note-list"></div></section>
+        <section><h2>概览 / 参考</h2><div id="reference-list"></div></section>
+        <section id="pending-section" tabindex="-1">
+          <h2>待审提案</h2>
+          <div id="proposal-list"></div>
+          <button type="button" id="clear-proposals" class="text-link" disabled>清除已处理提案</button>
+        </section>
+      </div>
+    </aside>
+
+    <section id="graph-pane" aria-label="依赖图谱">
+      <div id="canvas-tools" class="canvas-tools">
+        <div class="toolbar">
+          <button type="button" id="fit">适应画布</button>
+          <button type="button" id="zoom-out" aria-label="缩小">−</button>
+          <button type="button" id="zoom-in" aria-label="放大">+</button>
+          <label class="toggle"><input type="checkbox" id="local">局部图谱</label>
+          <select id="direction" aria-label="局部图谱方向" disabled>
+            <option value="both">双向</option><option value="upstream">上游</option><option value="downstream">下游</option>
+          </select>
+          <select id="depth" aria-label="局部图谱深度" disabled>
+            <option value="1">1 层</option><option value="2">2 层</option><option value="3">3 层</option>
+          </select>
+          <label class="toggle"><input type="checkbox" id="show-notes" checked>显示笔记</label>
+        </div>
+        <div class="toolbar legend" aria-label="边类型">
+          <label><input type="checkbox" value="requires" checked><i class="requires"></i>依赖</label>
+          <label><input type="checkbox" value="assumes" checked><i class="assumes"></i>前提</label>
+          <label><input type="checkbox" value="supports" checked><i class="supports"></i>支持</label>
+          <label><input type="checkbox" value="challenges" checked><i class="challenges"></i>反证</label>
+          <label><input type="checkbox" value="relates" checked><i class="relates"></i>关联</label>
+        </div>
+      </div>
+      <div id="canvas-message" class="canvas-message" role="status" hidden></div>
+      <div id="canvas-frame">
+        <svg id="dag" tabindex="0" role="group" aria-label="交互式图谱，使用方向键平移">
+          <title>依赖图谱</title>
+        </svg>
+        <p id="canvas-empty" class="canvas-empty" role="status" hidden></p>
+      </div>
+      <div id="list-view" hidden></div>
+      <footer id="graph-stats" class="graph-stats" role="status"></footer>
+    </section>
+
+    <aside id="rightbar" aria-label="检查器">
+      <div id="inspector"></div>
+      <div id="review" hidden></div>
+    </aside>
+  </main>
+
+  <dialog id="graph-dialog" aria-labelledby="graph-dialog-title">
+    <form>
+      <h2 id="graph-dialog-title">图谱</h2>
+      <label class="field"><span>名称</span><input name="name" required autofocus></label>
+      <p class="form-error" role="alert"></p>
+      <div class="toolbar dialog-actions"><button type="button" data-close>取消</button><button type="submit" class="accent">保存</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="item-dialog" aria-labelledby="item-dialog-title">
+    <form>
+      <h2 id="item-dialog-title">新建</h2>
+      <label class="field"><span>标题</span><input name="title" maxlength="200" required autofocus></label>
+      <div id="new-note-fields" hidden>
+        <label class="field"><span>笔记 ID（可自动分配）</span><input name="id" placeholder="n-slug" maxlength="64" pattern="n-[a-z0-9][a-z0-9\-]{0,62}"></label>
+        <label class="field"><span>类型</span><select name="kind"></select></label>
+        <label class="toggle"><input name="in_graph" type="checkbox" checked>显示在图谱上</label>
+      </div>
+      <p class="form-error" role="alert"></p>
+      <div class="toolbar dialog-actions"><button type="button" data-close>取消</button><button type="submit" class="accent">创建</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="anchor-dialog" aria-labelledby="anchor-dialog-title">
+    <form>
+      <h2 id="anchor-dialog-title">添加代码锚点</h2>
+      <div class="field-grid">
+        <label class="field"><span>仓库</span><select name="repo" required autofocus></select></label>
+        <label class="field"><span>类型</span><select name="kind"><option value="file">file</option><option value="commit">commit</option><option value="branch">branch</option></select></label>
+      </div>
+      <label class="field"><span>Git ref</span><input name="ref" list="git-ref-options" required maxlength="255" value="HEAD"></label>
+      <datalist id="git-ref-options"></datalist>
+      <p id="git-ref-status" class="muted" role="status"></p>
+      <div id="anchor-file-fields">
+        <label class="field"><span>仓库内路径</span><input name="path" maxlength="1000" placeholder="src/example.py"></label>
+        <div class="field-grid">
+          <label class="field"><span>起始行</span><input name="start_line" type="number" step="1" min="1"></label>
+          <label class="field"><span>结束行</span><input name="end_line" type="number" step="1" min="1"></label>
+        </div>
+      </div>
+      <label class="field"><span>符号</span><input name="symbol" maxlength="160"></label>
+      <label class="field"><span>主张</span><textarea name="claim" maxlength="500" rows="3"></textarea></label>
+      <p class="form-error" role="alert"></p>
+      <div class="toolbar dialog-actions"><button type="button" data-close>取消</button><button type="submit" class="accent">固定锚点</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="move-dialog" aria-labelledby="move-dialog-title">
+    <form>
+      <h2 id="move-dialog-title">移动工单</h2>
+      <p class="muted">子工单会一起移动。跨图谱的依赖会阻止移动。</p>
+      <label class="field"><span>目标图谱</span><select name="target_graph_id" required autofocus></select></label>
+      <p class="form-error" role="alert"></p>
+      <div class="toolbar dialog-actions"><button type="button" data-close>取消</button><button type="submit" class="accent">移动</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="dependency-dialog" aria-labelledby="dependency-dialog-title">
+    <form>
+      <h2 id="dependency-dialog-title">添加依赖</h2>
+      <label class="field"><span>工单</span><select name="ticket_id" required autofocus></select></label>
+      <p class="form-error" role="alert"></p>
+      <div class="toolbar dialog-actions"><button type="button" data-close>取消</button><button type="submit" class="accent">连接</button></div>
+    </form>
+  </dialog>
+
+  <dialog id="command-palette" aria-label="命令面板">
+    <div class="palette-search"><input id="palette-query" type="search" placeholder="搜索工单、笔记或命令" aria-label="搜索工单、笔记或命令"
+      role="combobox" aria-controls="palette-results" aria-autocomplete="list" aria-expanded="false" autocomplete="off" autofocus>
+      <button type="button" id="close-palette" aria-label="关闭命令面板"><kbd>Esc</kbd></button>
+    </div>
+    <div id="palette-results" role="listbox" aria-label="命令和项目"></div>
+    <p id="palette-status" class="muted" role="status"></p>
+  </dialog>
+</body>
+</html>
