@@ -252,10 +252,65 @@ pre {
 }
 
 .workspace {
+  --left-w: 250px;
+  --right-w: 360px;
   display: grid;
   flex: 1;
   min-height: 0;
-  grid-template-columns: minmax(210px, 245px) minmax(0, 1fr) minmax(295px, 355px);
+  grid-template-columns: var(--left-w) 5px minmax(260px, 1fr) 5px var(--right-w);
+}
+
+.workspace.left-collapsed {
+  grid-template-columns: 0 0 minmax(260px, 1fr) 5px var(--right-w);
+}
+
+.workspace.right-collapsed {
+  grid-template-columns: var(--left-w) 5px minmax(260px, 1fr) 0 0;
+}
+
+.workspace.left-collapsed.right-collapsed {
+  grid-template-columns: 0 0 minmax(0, 1fr) 0 0;
+}
+
+.workspace.left-collapsed #navigator,
+.workspace.left-collapsed #split-left,
+.workspace.right-collapsed #rightbar,
+.workspace.right-collapsed #split-right {
+  display: none;
+}
+
+.splitter {
+  position: relative;
+  background: var(--rule2);
+  cursor: col-resize;
+  touch-action: none;
+  transition: background .12s ease;
+}
+
+.splitter::before {
+  content: "";
+  position: absolute;
+  inset: 0 -3px;
+}
+
+.splitter:hover,
+.splitter.dragging,
+.splitter:focus-visible {
+  background: var(--brass);
+}
+
+body.resizing {
+  cursor: col-resize;
+  user-select: none;
+}
+
+#toggle-left[aria-pressed="false"],
+#toggle-right[aria-pressed="false"] {
+  opacity: .72;
+}
+
+#toggle-right {
+  margin-left: auto;
 }
 
 #navigator,
@@ -590,10 +645,19 @@ pre {
   font-size: 14px;
 }
 
+.edge {
+  cursor: pointer;
+}
+
 .edge path {
   fill: none;
   stroke: var(--edge);
   stroke-width: 1.6;
+}
+
+.edge:hover path:not(.edge-hit) {
+  stroke: var(--brass);
+  stroke-width: 2.6;
 }
 
 .edge.assumes path { stroke-dasharray: 6 4; }
@@ -627,8 +691,18 @@ pre {
   opacity: .23;
 }
 
-.edge.highlighted path {
+.edge.highlighted path:not(.edge-hit) {
   stroke-width: 3;
+}
+
+.edge path.edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 12;
+  stroke-dasharray: none;
+  opacity: 1;
+  pointer-events: stroke;
+  cursor: pointer;
 }
 
 #list-view {
@@ -1037,10 +1111,6 @@ dialog form > div:not(.toolbar) > .field {
   .mast-actions {
     margin-left: 0;
   }
-
-  .workspace {
-    grid-template-columns: minmax(170px, 205px) minmax(0, 1fr) minmax(265px, 295px);
-  }
 }
 
 @media (max-width: 730px) {
@@ -1048,8 +1118,22 @@ dialog form > div:not(.toolbar) > .field {
     height: auto;
   }
 
-  .workspace {
+  .workspace,
+  .workspace.left-collapsed,
+  .workspace.right-collapsed,
+  .workspace.left-collapsed.right-collapsed {
     grid-template-columns: minmax(0, 1fr);
+  }
+
+  .splitter,
+  #toggle-left,
+  #toggle-right {
+    display: none;
+  }
+
+  .workspace.left-collapsed #navigator,
+  .workspace.right-collapsed #rightbar {
+    display: block;
   }
 
   #navigator,

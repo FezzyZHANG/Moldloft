@@ -59,11 +59,14 @@ export class Canvas {
       this.zoom(Math.exp(-event.deltaY * 0.0015), event.clientX - rect.left, event.clientY - rect.top);
     }, {passive: false});
     this.svg.addEventListener('pointerdown', event => {
-      if (event.button !== 0 || event.target.closest('[data-node]')) return;
+      if (event.button !== 0 || event.target.closest('[data-node], .edge')) return;
       this.svg.focus({preventScroll: true});
       this.svg.setPointerCapture(event.pointerId);
       this.drag = {id: event.pointerId, x: event.clientX, y: event.clientY};
       this.svg.classList.add('panning');
+    });
+    this.svg.addEventListener('dblclick', event => {
+      if (!event.target.closest('[data-node], .edge')) this.fit();
     });
     this.svg.addEventListener('pointermove', event => {
       if (this.drag?.id !== event.pointerId) return;
@@ -75,10 +78,14 @@ export class Canvas {
       this.svg.classList.remove('panning');
     });
     this.svg.addEventListener('keydown', event => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (event.key === '+' || event.key === '=') { event.preventDefault(); this.zoom(1.2); return; }
+      if (event.key === '-') { event.preventDefault(); this.zoom(1 / 1.2); return; }
+      if (event.key === '0') { event.preventDefault(); this.fit(); return; }
       const step = event.shiftKey ? 96 : 32;
       const shifts = {ArrowLeft: [step, 0], ArrowRight: [-step, 0],
         ArrowUp: [0, step], ArrowDown: [0, -step]};
-      if (!Object.hasOwn(shifts, event.key) || event.altKey || event.ctrlKey || event.metaKey) return;
+      if (!Object.hasOwn(shifts, event.key)) return;
       event.preventDefault();
       this.pan(...shifts[event.key]);
     });
@@ -143,9 +150,17 @@ export class Canvas {
     const bounds = this.positions.get(this.revealKey);
     if (!bounds || !this.size || !this.frame.clientWidth) return;
     this.revealKey = null;
+    const cx = bounds.x + Math.min(bounds.width, 244) / 2;
+    const cy = bounds.y + Math.min(bounds.height, 114) / 2;
+    if (this.camera.k < 0.55) {
+      const nextK = 0.85;
+      this.camera = {x: this.size.w / 2 - cx * nextK, y: this.size.h / 2 - cy * nextK, k: nextK};
+      this.transform();
+      return;
+    }
     const {x, y, k} = this.camera;
-    const px = x + (bounds.x + Math.min(bounds.width, 244) / 2) * k;
-    const py = y + (bounds.y + Math.min(bounds.height, 114) / 2) * k;
+    const px = x + cx * k;
+    const py = y + cy * k;
     if (px < 24 || py < 24 || px > this.size.w - 24 || py > this.size.h - 24) {
       this.pan(this.size.w / 2 - px, this.size.h / 2 - py);
     }
@@ -193,7 +208,7 @@ export class Canvas {
     const focus = document.activeElement;
     const focused = focus?.closest('[data-node]')?.getAttribute('data-node');
     const containers = svg('g');
-    const edges = svg('g', {'aria-hidden': 'true'});
+    const edges = svg('g');
     const cards = svg('g');
     this.cards.clear();
     this.routes = [];
@@ -218,15 +233,30 @@ export class Canvas {
     layout.children.forEach(node => visit(node, 0, 0));
 
     for (const edge of layout.edges) {
-      const {type, change} = metadata.get(edge.id);
+      const {type, change, edges: items} = metadata.get(edge.id);
       const origin = this.positions.get(edge.container) || {x: 0, y: 0};
       const group = svg('g', {class: `edge ${type} ${change}`, transform: `translate(${origin.x} ${origin.y})`});
+      const label = relationLabels[type] || type;
+      const desc = (items || []).map(row => type === 'requires'
+        ? `#${row.blocker_id} → #${row.blocked_id}`
+        : `${row.source_note_id} → ${row.target_type === 'ticket' ? `#${row.target_id}` : row.target_id}`);
+      if (desc.length) group.append(svg('title', {}, `${label}\n${desc.join('\n')}`));
       const outgoing = type === 'relates' ? {} : {'marker-end': `url(#arrow-${type})`};
       for (const section of edge.sections || []) {
         const points = [section.startPoint, ...(section.bendPoints || []), section.endPoint];
-        group.append(svg('path', {d: points.map(({x, y}, i) => `${i ? 'L' : 'M'}${x},${y}`).join(' '),
-          ...(!section.outgoingSections?.length ? outgoing : {})}));
+        const d = points.map(({x, y}, i) => `${i ? 'L' : 'M'}${x},${y}`).join(' ');
+        group.append(
+          svg('path', {d, class: 'edge-hit'}),
+          svg('path', {d, ...(!section.outgoingSections?.length ? outgoing : {})}),
+        );
       }
+      group.addEventListener('click', event => {
+        event.stopPropagation();
+        const first = items?.[0];
+        if (!first) return;
+        if (type === 'requires') this.actions.pickNode('ticket', first.blocked_id);
+        else this.actions.pickNode('note', first.source_note_id);
+      });
       for (const label of edge.labels || []) {
         group.append(svg('text', {x: label.x + label.width / 2, y: label.y + 12,
           'text-anchor': 'middle'}, label.text));

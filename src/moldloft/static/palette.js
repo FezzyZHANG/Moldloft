@@ -127,7 +127,13 @@ export class Palette {
   }
 
   keyboard(event) {
-    if (!this.rows.length || event.isComposing || event.target !== this.query) return;
+    if (event.isComposing || event.target !== this.query) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.dialog.close();
+      return;
+    }
+    if (!this.rows.length) return;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();
       const step = event.key === 'ArrowDown' ? 1 : -1;

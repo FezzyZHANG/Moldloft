@@ -57,10 +57,13 @@
         </section>
       </div>
     </aside>
+    <div class="splitter" id="split-left" role="separator" aria-orientation="vertical" tabindex="0"
+      aria-label="拖拽调整左侧栏宽度（双击重置）" aria-valuemin="180" aria-valuemax="520" aria-valuenow="250" title="拖拽调整左侧栏宽度（双击重置）"></div>
 
     <section id="graph-pane" aria-label="依赖图谱">
       <div id="canvas-tools" class="canvas-tools">
         <div class="toolbar">
+          <button type="button" id="toggle-left" aria-pressed="true" title="显示 / 隐藏左侧栏 (Alt+[)">左栏</button>
           <button type="button" id="fit">适应画布</button>
           <button type="button" id="zoom-out" aria-label="缩小">−</button>
           <button type="button" id="zoom-in" aria-label="放大">+</button>
@@ -72,6 +75,7 @@
             <option value="1">1 层</option><option value="2">2 层</option><option value="3">3 层</option>
           </select>
           <label class="toggle"><input type="checkbox" id="show-notes" checked>显示笔记</label>
+          <button type="button" id="toggle-right" aria-pressed="true" title="显示 / 隐藏检查器 (Alt+])">右栏</button>
         </div>
         <div class="toolbar legend" aria-label="边类型">
           <label><input type="checkbox" value="requires" checked><i class="requires"></i>依赖</label>
@@ -91,6 +95,8 @@
       <div id="list-view" hidden></div>
       <footer id="graph-stats" class="graph-stats" role="status"></footer>
     </section>
+    <div class="splitter" id="split-right" role="separator" aria-orientation="vertical" tabindex="0"
+      aria-label="拖拽调整右侧检查器宽度（双击重置）" aria-valuemin="260" aria-valuemax="680" aria-valuenow="360" title="拖拽调整右侧检查器宽度（双击重置）"></div>
 
     <aside id="rightbar" aria-label="检查器">
       <div id="inspector"></div>

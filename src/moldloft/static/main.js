@@ -2,6 +2,7 @@ import {Canvas} from './canvas.js';
 import {Inspector} from './inspector.js';
 import {filterItems, groupKey, groupValue, matchesItem, matchesStatus, previewOverlay, project, ticketKey} from './layout.js';
 import {Palette} from './palette.js';
+import {PaneLayout} from './panes.js';
 import {Review} from './review.js';
 import {Sidebar} from './sidebar.js';
 import {findItem, readTarget, targetParam, WorkbenchStore} from './store.js';
@@ -38,6 +39,12 @@ const inspector = new Inspector(store, actions);
 const review = new Review(store, actions);
 const canvas = new Canvas(actions);
 new Palette(store, actions);
+new PaneLayout(document.querySelector('.workspace'), {
+  leftSplit: byId('split-left'),
+  rightSplit: byId('split-right'),
+  leftToggle: byId('toggle-left'),
+  rightToggle: byId('toggle-right'),
+});
 let navigation = 0;
 
 function readLocation() {
