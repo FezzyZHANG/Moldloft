@@ -737,6 +737,11 @@ body.resizing {
   pointer-events: none;
 }
 
+.node-accent polygon {
+  fill: inherit;
+  stroke: none;
+}
+
 .graph-node.is-ready > .node-accent { fill: var(--verd); }
 .graph-node.status-in_progress > .node-accent { fill: var(--brass); }
 .graph-node.is-blocked > .node-accent { fill: var(--rust); }

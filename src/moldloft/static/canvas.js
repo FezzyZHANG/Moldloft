@@ -9,6 +9,15 @@ const svg = (tag, attributes = {}, text) => {
   return node;
 };
 
+function noteAccentDashes(height) {
+  const group = svg('g', {class: 'node-accent note-accent-dashes'});
+  const w = 5, dash = 7, step = 12;
+  for (let y = 2; y + dash + w <= height - 2; y += step) {
+    group.append(svg('polygon', {points: `0,${y + w} ${w},${y} ${w},${y + dash} 0,${y + dash + w}`}));
+  }
+  return group;
+}
+
 function geometryKey(projection) {
   const shape = node => [node.id, node.width, node.height, node.children?.map(shape)];
   return JSON.stringify([projection.children.map(shape), projection.edges.map(edge => [
@@ -296,7 +305,7 @@ export class Canvas {
     const activate = () => item ? this.actions.pickNode(ticket ? 'ticket' : 'note', item.id) : toggle();
     card.append(svg('title', {}, caption), svg('rect', {class: 'node-surface', width, height}));
     if (item) {
-      card.append(svg('rect', {class: 'node-accent', x: 0, y: 0, width: 4, height}));
+      card.append(note ? noteAccentDashes(height) : svg('rect', {class: 'node-accent', x: 0, y: 0, width: 4, height}));
       if (typeof item.id !== 'number' && ticket && item.id.startsWith('new:')) card.classList.add('preview-item');
       const label = ticket ? `#${item.id}  /  ${item.status}` : `${item.kind}  /  ${item.state}`;
       card.append(svg('text', {x: 14, y: 19, class: 'node-meta'}, label));
