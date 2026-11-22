@@ -909,9 +909,25 @@ body.resizing {
   cursor: pointer;
 }
 
+.edge-stop.tone-info { stop-color: var(--info); }
+.edge-stop.tone-info-soft { stop-color: var(--info-soft); }
+.edge-stop.tone-attn { stop-color: var(--attn); }
+.edge-stop.tone-danger { stop-color: var(--danger); }
+.edge-stop.tone-struct { stop-color: var(--struct); }
+.edge-stop.tone-muted { stop-color: var(--muted); }
+.edge-stop.tone-neutral { stop-color: var(--node-border); }
+
+.arrow.tone-info { --edge: var(--info); }
+.arrow.tone-info-soft { --edge: var(--info-soft); }
+.arrow.tone-attn { --edge: var(--attn); }
+.arrow.tone-danger { --edge: var(--danger); }
+.arrow.tone-struct { --edge: var(--struct); }
+.arrow.tone-muted { --edge: var(--muted); }
+.arrow.tone-neutral { --edge: var(--node-border); }
+
 .edge path.edge-main {
   fill: none;
-  stroke: var(--edge);
+  stroke: var(--edge-stroke, var(--edge));
   stroke-width: 2.5;
 }
 
@@ -919,6 +935,11 @@ body.resizing {
   stroke: var(--attn);
   stroke-width: 3.2;
 }
+
+.edge.requires:hover path.edge-main[marker-end] { marker-end: url(#arrow-requires-attn); }
+.edge.supports:hover path.edge-main[marker-end] { marker-end: url(#arrow-supports-attn); }
+.edge.assumes:hover path.edge-main[marker-end] { marker-end: url(#arrow-assumes-attn); }
+.edge.challenges:hover path.edge-main[marker-end] { marker-end: url(#arrow-challenges-attn); }
 
 .edge.assumes path.edge-main {
   stroke-width: 2;

@@ -18,6 +18,41 @@ function noteAccentDashes(height) {
   return group;
 }
 
+export const EDGE_TONES = Object.freeze(['info', 'info-soft', 'attn', 'danger', 'struct', 'muted', 'neutral']);
+
+export function nodeTone(data) {
+  if (data?.ticket) {
+    const {status, blockers, ready} = data.ticket;
+    if (status === 'closed') return 'muted';
+    if (status === 'done') return 'struct';
+    if (blockers?.length) return 'danger';
+    if (status === 'in_progress') return 'attn';
+    if (ready) return 'info';
+    return 'neutral';
+  }
+  if (data?.note) {
+    const map = {assumption: 'attn', evidence: 'info', decision: 'struct', question: 'info-soft'};
+    return map[data.note.kind] || 'info';
+  }
+  if (data) return 'struct';
+  return 'neutral';
+}
+
+function edgeGradient(id, sections, sourceTone, targetTone) {
+  const first = sections?.[0]?.startPoint;
+  const last = sections?.[sections.length - 1]?.endPoint;
+  if (!first || !last) return null;
+  const x2 = first.x === last.x && first.y === last.y ? last.x + 1 : last.x;
+  const gradient = svg('linearGradient', {
+    id, gradientUnits: 'userSpaceOnUse', x1: first.x, y1: first.y, x2, y2: last.y,
+  });
+  gradient.append(
+    svg('stop', {offset: '0%', class: `edge-stop tone-${sourceTone}`}),
+    svg('stop', {offset: '100%', class: `edge-stop tone-${targetTone}`}),
+  );
+  return gradient;
+}
+
 function geometryKey(projection) {
   const shape = node => [node.id, node.width, node.height, node.children?.map(shape)];
   return JSON.stringify([projection.children.map(shape), projection.edges.map(edge => [
@@ -33,6 +68,7 @@ export class Canvas {
     this.empty = byId('canvas-empty');
     this.layer = svg('g');
     const defs = svg('defs');
+    this.edgeDefs = svg('defs');
     const markerShapes = {
       requires: 'M0 1 L10 5 L0 9 z',
       supports: 'M0 1 L10 5 L0 9 z',
@@ -40,12 +76,14 @@ export class Canvas {
       challenges: 'M8 1 L8 9 M0 5 L8 5',
     };
     for (const [type, d] of Object.entries(markerShapes)) {
-      const marker = svg('marker', {id: `arrow-${type}`, viewBox: '0 0 10 10', refX: 9, refY: 5,
-        markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse'});
-      marker.append(svg('path', {d, class: `arrow ${type}`}));
-      defs.append(marker);
+      for (const tone of EDGE_TONES) {
+        const marker = svg('marker', {id: `arrow-${type}-${tone}`, viewBox: '0 0 10 10', refX: 9, refY: 5,
+          markerWidth: 7, markerHeight: 7, orient: 'auto-start-reverse'});
+        marker.append(svg('path', {d, class: `arrow ${type} tone-${tone}`}));
+        defs.append(marker);
+      }
     }
-    this.svg.append(defs, this.layer);
+    this.svg.append(defs, this.edgeDefs, this.layer);
     try {
       this.engine = new window.ELK({workerUrl: '/static/vendor/elk/elk-worker.min.js'});
     } catch (error) {
@@ -151,6 +189,7 @@ export class Canvas {
     this.request = null;
     this.layout = null;
     this.positions.clear();
+    this.edgeDefs.replaceChildren();
     this.layer.replaceChildren();
     this.fitPending = true;
     this.revealKey = null;
@@ -247,16 +286,26 @@ export class Canvas {
     };
     layout.children.forEach(node => visit(node, 0, 0));
 
-    for (const edge of layout.edges) {
+    const gradients = [];
+    for (const [edgeIndex, edge] of layout.edges.entries()) {
       const {type, change, edges: items} = metadata.get(edge.id);
       const origin = this.positions.get(edge.container) || {x: 0, y: 0};
+      const sourceTone = nodeTone(metadata.get(edge.sources[0]));
+      const targetTone = nodeTone(metadata.get(edge.targets[0]));
+      const markerTone = change === 'removed' ? 'danger' : targetTone;
       const group = svg('g', {class: `edge ${type} ${change}`, transform: `translate(${origin.x} ${origin.y})`});
+      const gradId = `edge-grad-${edgeIndex}`;
+      const gradient = change === 'removed' ? null : edgeGradient(gradId, edge.sections, sourceTone, targetTone);
+      if (gradient) {
+        gradients.push(gradient);
+        group.style.setProperty('--edge-stroke', `url(#${gradId})`);
+      }
       const label = relationLabels[type] || type;
       const desc = (items || []).map(row => type === 'requires'
         ? `#${row.blocker_id} → #${row.blocked_id}`
         : `${row.source_note_id} → ${row.target_type === 'ticket' ? `#${row.target_id}` : row.target_id}`);
       if (desc.length) group.append(svg('title', {}, `${label}\n${desc.join('\n')}`));
-      const outgoing = type === 'relates' ? {} : {'marker-end': `url(#arrow-${type})`};
+      const outgoing = type === 'relates' ? {} : {'marker-end': `url(#arrow-${type}-${markerTone})`};
       for (const section of edge.sections || []) {
         const points = [section.startPoint, ...(section.bendPoints || []), section.endPoint];
         const d = points.map(({x, y}, i) => `${i ? 'L' : 'M'}${x},${y}`).join(' ');
@@ -280,6 +329,7 @@ export class Canvas {
       this.routes.push({group, source: edge.sources[0], target: edge.targets[0]});
       edges.append(group);
     }
+    this.edgeDefs.replaceChildren(...gradients);
     this.layer.replaceChildren(containers, edges, cards);
     const next = this.positions.get(selected);
     if (this.fitPending) this.fit();

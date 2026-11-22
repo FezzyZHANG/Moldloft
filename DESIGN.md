@@ -57,7 +57,7 @@ See the [SVG drawing code](src/moldloft/static/canvas.js).
 
 ## Edges and navigation
 
-| Canvas edge | Stroke token | Width and dash array (SVG units) | End marker (SVG path) |
+| Canvas edge | Fallback token | Width and dash array (SVG units) | End marker (SVG path) |
 | --- | --- | --- | --- |
 | `requires` (blocker → blocked ticket) | `--edge-requires` | 2.5, solid | Filled triangle `M0 1 L10 5 L0 9 z` |
 | `assumes` | `--attn-soft` | 2, `10 5` | Open chevron `M1 1 L9 5 L1 9` |
@@ -65,6 +65,10 @@ See the [SVG drawing code](src/moldloft/static/canvas.js).
 | `challenges` | `--danger` | 2.6, `9 3 2 3` | Terminal bar and stem `M8 1 L8 9 M0 5 L8 5` |
 | `relates` | `--muted` | 1.6, `2 5`, round caps | None |
 
+Each rendered edge receives a `userSpaceOnUse` SVG linear gradient from its
+source node's accent tone (ticket state or note kind) to its target node's
+accent tone, and its end marker matches the target tone. Hovering an edge turns
+both stroke and marker to `--attn`; proposal-removed edges stay `--danger`.
 Markers use a 10 × 10 viewBox, a 7 × 7 marker size and reference point (9, 5).
 They appear on terminal route sections. Open markers use a 1.85-unit stroke
 with round caps and joins. A transparent 12-unit stroke gives
